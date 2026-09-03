@@ -1,15 +1,16 @@
 "use client";
 
-import { FormError } from "@/components/layout/form-error";
-import { Funnel } from "@/components/layout/funnel/funnel";
+import { FormError } from "@/components/layout/primitives";
 import { FunnelConfigError, FunnelDescription } from "@/components/layout/class-tagged";
-import { FunnelHeader } from "@/components/layout/funnel/funnel-header";
-import { FunnelLoading } from "@/components/layout/funnel/funnel-loading";
-import { FunnelTitle } from "@/components/layout/funnel/funnel-title";
-import { FunnelScreenControls } from "@/components/layout/funnel/funnel-screen-controls";
+import {
+  Funnel,
+  FunnelHeader,
+  FunnelLoading,
+  FunnelScreenControls,
+  FunnelTitle,
+} from "@/components/layout/funnel-primitives";
 import { FunnelStepProgress } from "@/app/components/funnel/funnel-progress";
-import { ResultScreen } from "@/app/components/funnel/result-screen";
-import { ScreenRenderer } from "@/app/components/funnel/screen-renderer";
+import { ResultScreen, ScreenRenderer } from "@/app/components/funnel/screens";
 import { useFunnelController } from "@/app/components/funnel/use-funnel-controller";
 import type { FunnelStep, FunnelSessionState, StepAnswer } from "@/system/funnel/config.types";
 import type { FunnelApiState } from "@/system/funnel/api-response.schema";
@@ -70,11 +71,7 @@ function FunnelStepView({
           <FunnelDescription>{currentStep.description}</FunnelDescription>
         ) : null}
       </FunnelHeader>
-      <ScreenRenderer
-        step={currentStep}
-        draftAnswer={draftAnswer}
-        onDraftChange={onDraftChange}
-      />
+      <ScreenRenderer step={currentStep} draftAnswer={draftAnswer} onDraftChange={onDraftChange} />
       {validationError ? <FormError role="alert">{validationError}</FormError> : null}
       <FunnelScreenControls
         showBack={canGoBack}

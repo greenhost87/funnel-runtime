@@ -18,9 +18,12 @@
   },
   "dependencies": {
     "bulma": "^1.0.4",
+    "bulma-calendar-js": "^7.1.2",
     "next": "^15.5.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-is": "^19.2.8",
+    "recharts": "^3.10.1",
     "sass": "^1.92.1",
     "valibot": "^1.1.0"
   },

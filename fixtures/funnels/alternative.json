@@ -94,7 +94,15 @@
   "variants": {
     "A": {},
     "B": {
-      "stepOrder": ["goal", "timeline", "habits", "budget", "welcome", "summary"],
+      "stepOrder": [
+        "goal",
+        "timeline",
+        "habits",
+        "budget",
+        "training-frequency",
+        "welcome",
+        "summary"
+      ],
       "stepTextOverrides": {
         "goal": { "title": "Top goal?" },
         "timeline": { "title": "When?" }

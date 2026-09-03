@@ -1,0 +1,162 @@
+@import "bulma-calendar-js/dist/css/bulma-calendar.min.css";
+
+.datetimepicker-dummy {
+  width: 100%;
+}
+
+.datetimepicker-dummy .datetimepicker-dummy-wrapper {
+  width: 100%;
+}
+
+@mixin datetimepicker-theme {
+  .datetimepicker {
+    background: var(--bulma-scheme-main);
+    color: var(--bulma-text);
+
+    .datetimepicker-header {
+      box-shadow: 0 0.2rem 0.2rem -0.2rem
+        hsla(var(--bulma-scheme-h), var(--bulma-scheme-s), var(--bulma-scheme-invert-l), 0.15);
+
+      .datetimepicker-selection-from,
+      .datetimepicker-selection-to {
+        color: var(--bulma-text-weak);
+      }
+
+      .datetimepicker-selection-day {
+        color: var(--bulma-primary);
+      }
+
+      .datetimepicker-selection-month,
+      .datetimepicker-selection-weekday {
+        color: var(--bulma-text);
+      }
+
+      .datetimepicker-selection-weekday {
+        color: var(--bulma-text-weak);
+      }
+    }
+
+    .datepicker-nav {
+      background: var(--bulma-primary);
+      color: var(--bulma-primary-invert);
+
+      .datepicker-nav-month,
+      .datepicker-nav-year,
+      .datepicker-nav-previous,
+      .datepicker-nav-next {
+        color: var(--bulma-primary-invert);
+      }
+    }
+
+    .datepicker-body {
+      box-shadow:
+        0 2px 3px
+          hsla(var(--bulma-scheme-h), var(--bulma-scheme-s), var(--bulma-scheme-invert-l), 0.2),
+        0 0 0 1px var(--bulma-border);
+    }
+
+    .datepicker-body .datepicker-weekdays .datepicker-date {
+      color: var(--bulma-text-weak);
+    }
+
+    .datepicker-body .datepicker-dates .datepicker-days {
+      color: var(--bulma-text-weak);
+
+      .datepicker-date {
+        background: transparent;
+
+        .date-item {
+          color: var(--bulma-text);
+
+          &.is-today {
+            background: transparent;
+            border: 0.1rem dotted var(--bulma-primary);
+            color: var(--bulma-primary);
+          }
+
+          &.is-active {
+            background: var(--bulma-primary);
+            border-color: var(--bulma-primary);
+            color: var(--bulma-primary-invert);
+          }
+
+          &.is-active.is-today {
+            border-color: var(--bulma-primary-invert);
+            color: var(--bulma-primary-invert);
+          }
+
+          &:focus,
+          &:hover {
+            background: var(--bulma-background);
+            border-color: var(--bulma-primary);
+            color: var(--bulma-text);
+          }
+        }
+
+        &.is-current-month {
+          background: transparent;
+        }
+
+        &.is-disabled,
+        &[disabled] {
+          background-color: var(--bulma-background);
+        }
+      }
+    }
+
+    .datepicker-body .datepicker-months,
+    .datepicker-body .datepicker-years {
+      .datepicker-month,
+      .datepicker-year {
+        color: var(--bulma-text);
+
+        &:hover {
+          background: var(--bulma-background);
+          border-color: var(--bulma-primary);
+          color: var(--bulma-text);
+        }
+      }
+    }
+
+    &.is-datetimepicker-default .datetimepicker-container {
+      &::after {
+        border-bottom-color: var(--bulma-scheme-main);
+      }
+
+      &::before {
+        border-bottom-color: var(--bulma-border);
+      }
+    }
+  }
+
+  .datetimepicker-dummy {
+    &::before {
+      background-color: var(--bulma-primary);
+    }
+
+    .datetimepicker-dummy-wrapper {
+      &::before {
+        background-color: var(--bulma-primary);
+      }
+
+      &:focus,
+      &.is-focused,
+      &:active,
+      &.is-active {
+        border-color: var(--bulma-primary);
+      }
+
+      .datetimepicker-dummy-input {
+        color: hsl(var(--bulma-input-h), var(--bulma-input-s), var(--bulma-input-color-l));
+      }
+    }
+
+    .datetimepicker-clear-button {
+      color: var(--bulma-primary);
+    }
+  }
+}
+
+:root {
+  @include datetimepicker-theme;
+}

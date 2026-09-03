@@ -39,6 +39,33 @@ function eventNames(batches: EventBatchPayload[]): string[] {
   return batches.flatMap((batch) => batch.events.map((event) => event.eventName));
 }
 
+const SESSION_READY_TIMEOUT = 15_000;
+
+async function waitForSessionResponse(page: Page) {
+  return page.waitForResponse(
+    (response) => response.url().includes("/api/funnel/session") && response.ok(),
+    { timeout: SESSION_READY_TIMEOUT },
+  );
+}
+
+async function openFunnel(page: Page, path: string) {
+  const sessionReady = waitForSessionResponse(page);
+  await page.goto(path);
+  await sessionReady;
+}
+
+async function openFunnelWithSession(page: Page, path: string) {
+  const sessionReady = waitForSessionResponse(page);
+  await page.goto(path);
+  return sessionReady;
+}
+
+async function reloadFunnel(page: Page) {
+  const sessionReady = waitForSessionResponse(page);
+  await page.reload();
+  await sessionReady;
+}
+
 async function adminLogin(page: Page) {
   await page.goto("/admin/login");
   await page.getByLabel("Password").fill("e2e-admin");
@@ -63,8 +90,7 @@ test.describe("funnel runtime e2e", () => {
   test("dynamic funnel flow with event emission and experiment variants", async ({ page }) => {
     const batches = collectEventBatches(page);
 
-    await page.goto("/?variant=A&utm_campaign=e2e-a");
-    await page.waitForResponse((response) => response.url().includes("/api/funnel/session"));
+    await openFunnel(page, "/?variant=A&utm_campaign=e2e-a");
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       "Discover your personalized wellness roadmap",
     );
@@ -93,8 +119,7 @@ test.describe("funnel runtime e2e", () => {
     expect(infoBatch).toBeUndefined();
 
     await page.context().clearCookies();
-    await page.goto("/?variant=B&utm_campaign=e2e-b");
-    await page.waitForResponse((response) => response.url().includes("/api/funnel/session"));
+    await openFunnel(page, "/?variant=B&utm_campaign=e2e-b");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Pick your #1 goal");
     await page.getByText("Boost daily energy and focus").click();
     await page.getByRole("button", { name: "Next" }).click();
@@ -102,8 +127,7 @@ test.describe("funnel runtime e2e", () => {
   });
 
   test("refresh, back navigation, and validation", async ({ page }) => {
-    await page.goto("/?variant=A");
-    await page.waitForResponse((response) => response.url().includes("/api/funnel/session"));
+    await openFunnel(page, "/?variant=A");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Next" }).click();
     await expect(
@@ -121,8 +145,7 @@ test.describe("funnel runtime e2e", () => {
       "What is your primary wellness goal",
     );
 
-    await page.reload();
-    await page.waitForResponse((response) => response.url().includes("/api/funnel/session"));
+    await reloadFunnel(page);
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       "What is your primary wellness goal",
     );
@@ -151,25 +174,24 @@ test.describe("funnel runtime e2e", () => {
       await route.continue();
     });
 
-    await page.goto("/?variant=A");
-    await page.waitForResponse((response) => response.url().includes("/api/funnel/session"));
+    await openFunnel(page, "/?variant=A");
     await expect.poll(() => sessionStartedPosts).toBeGreaterThanOrEqual(2);
     expect(sessionStartedEventId).toBeTruthy();
 
     const beforeReload = sessionStartedPosts;
-    await page.reload();
-    await page.waitForResponse((response) => response.url().includes("/api/funnel/session"));
+    await reloadFunnel(page);
     await page.waitForTimeout(500);
     expect(sessionStartedPosts).toBe(beforeReload);
   });
 
   test("admin publication, analytics, and rollback", async ({ page }) => {
-    await page.goto("/?variant=A");
-    await page.waitForResponse((response) => response.url().includes("/api/funnel/session"));
-    await page.waitForResponse(
+    const eventsReady = page.waitForResponse(
       (response) =>
         response.url().includes("/api/events") && response.request().method() === "POST",
+      { timeout: SESSION_READY_TIMEOUT },
     );
+    await openFunnel(page, "/?variant=A");
+    await eventsReady;
     await page.getByRole("button", { name: "Continue" }).click();
 
     await adminLogin(page);
@@ -211,8 +233,7 @@ test.describe("funnel runtime e2e", () => {
     page,
     browser,
   }) => {
-    await page.goto("/?variant=A");
-    await page.waitForResponse((response) => response.url().includes("/api/funnel/session"));
+    await openFunnel(page, "/?variant=A");
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       "What is your primary wellness goal",
@@ -234,16 +255,12 @@ test.describe("funnel runtime e2e", () => {
 
     const oldContext = page.context();
     const oldPage = await oldContext.newPage();
-    await oldPage.goto("/");
-    await oldPage.waitForResponse((response) => response.url().includes("/api/funnel/session"));
+    await openFunnel(oldPage, "/");
     await expect(oldPage.getByRole("heading", { level: 1 })).toHaveText(oldHeading ?? "");
 
     const newContext = await browser.newContext();
     const newPage = await newContext.newPage();
-    await newPage.goto("/?variant=A");
-    const sessionResponse = await newPage.waitForResponse((response) =>
-      response.url().includes("/api/funnel/session"),
-    );
+    const sessionResponse = await openFunnelWithSession(newPage, "/?variant=A");
     const sessionPayload = v.parse(SessionPayloadSchema, await sessionResponse.json());
     const sessionId = sessionPayload.sessionId;
     await expect(newPage.getByRole("heading", { level: 1 })).toContainText(
@@ -290,8 +307,8 @@ test.describe("funnel runtime e2e", () => {
 
   test("mobile layout at 320px has no horizontal overflow", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
-    await page.goto("/");
-    await page.waitForResponse((response) => response.url().includes("/api/funnel/session"));
+    await page.context().clearCookies();
+    await openFunnel(page, "/");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > 320);
     expect(overflow).toBe(false);
     await expect(page.getByRole("button", { name: /Continue|Next/ })).toBeVisible();

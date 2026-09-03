@@ -1,6 +1,12 @@
 import * as v from "valibot";
-import { FUNNEL_VARIANTS, STEP_TYPES, type FunnelConfig, type FunnelStep, type FunnelVariant } from "./config.types";
-import type { JsonValue } from "@/system/http/json-value.types";
+import {
+  FUNNEL_VARIANTS,
+  STEP_TYPES,
+  type FunnelConfig,
+  type FunnelStep,
+  type FunnelVariant,
+} from "./config.types";
+import type { JsonValue } from "@/system/http/json";
 import { resolveEffectiveConfig } from "./variant-resolver";
 
 const TransitionTargetSchema = v.union([
@@ -74,12 +80,7 @@ export const ResultConfigSchema = v.object({
   }),
 });
 
-export const StepAnswerSchema = v.union([
-  v.string(),
-  v.array(v.string()),
-  v.number(),
-  v.null(),
-]);
+export const StepAnswerSchema = v.union([v.string(), v.array(v.string()), v.number(), v.null()]);
 
 export const FunnelAnswersSchema = v.record(v.string(), StepAnswerSchema);
 
@@ -201,7 +202,10 @@ function validateVariantOverrides(config: FunnelConfig, stepIds: Set<string>): s
 
 function validateTransitionReferences(config: FunnelConfig): string[] {
   const stepIds = collectIds(config.steps);
-  return [...validateStepTransitions(config, stepIds), ...validateVariantOverrides(config, stepIds)];
+  return [
+    ...validateStepTransitions(config, stepIds),
+    ...validateVariantOverrides(config, stepIds),
+  ];
 }
 
 function hasBranching(config: FunnelConfig): boolean {

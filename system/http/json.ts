@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import * as v from "valibot";
 
+export type JsonPrimitive = string | number | boolean | null;
+
+export type JsonObject = { [key: string]: JsonValue | undefined };
+
+export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
+
 function parseJsonWithSchema<const TSchema extends v.GenericSchema>(
   source: string,
   schema: TSchema,

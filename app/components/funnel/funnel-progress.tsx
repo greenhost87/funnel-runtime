@@ -1,9 +1,11 @@
 "use client";
 
-import { FunnelProgress as FunnelProgressRoot } from "@/components/layout/funnel/funnel-progress";
-import { FunnelProgressBar } from "@/components/layout/funnel/funnel-progress-bar";
-import { FunnelProgressFill } from "@/components/layout/funnel/funnel-progress-fill";
-import { FunnelProgressLabel } from "@/components/layout/funnel/funnel-progress-label";
+import {
+  FunnelProgress as FunnelProgressRoot,
+  FunnelProgressBar,
+  FunnelProgressFill,
+  FunnelProgressLabel,
+} from "@/components/layout/funnel-primitives";
 
 type FunnelProgressProps = {
   current: number;

@@ -30,7 +30,9 @@ export async function POST(request: Request) {
 
   let config;
   try {
-    config = parseFunnelConfig(v.parse(v.pipe(v.string(), v.parseJson(), FunnelConfigSchema), await file.text()));
+    config = parseFunnelConfig(
+      v.parse(v.pipe(v.string(), v.parseJson(), FunnelConfigSchema), await file.text()),
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid config";
     return jsonResponse({ error: message }, { status: 400 });

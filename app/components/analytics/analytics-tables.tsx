@@ -22,7 +22,14 @@ export function ComparisonTable({ comparisons }: { comparisons: ComparisonRow[] 
       title="A/B and version comparison"
       emptyMessage="No A/B or version comparisons yet."
       rows={comparisons}
-      headers={["Version", "Variant", "Sessions started", "CTA from start", "Result reach", "CTA CTR"]}
+      headers={[
+        "Version",
+        "Variant",
+        "Sessions started",
+        "CTA from start",
+        "Result reach",
+        "CTA CTR",
+      ]}
       rowKey={(row) => `${row.versionId}:${row.variant}`}
       renderRow={(row) => (
         <>
@@ -44,8 +51,19 @@ export function EdgeTable({ edges }: { edges: EdgeMetric[] }) {
       title="Step transitions and drop-off"
       emptyMessage="No edge data yet."
       rows={edges}
-      headers={["Version", "Variant", "From", "To", "Views", "Completions", "Conversion", "Drop-off"]}
-      rowKey={(edge) => `${edge.versionId}-${edge.variant}-${edge.fromStepId}-${edge.toStepId ?? "result"}`}
+      headers={[
+        "Version",
+        "Variant",
+        "From",
+        "To",
+        "Views",
+        "Completions",
+        "Conversion",
+        "Drop-off",
+      ]}
+      rowKey={(edge) =>
+        `${edge.versionId}-${edge.variant}-${edge.fromStepId}-${edge.toStepId ?? "result"}`
+      }
       renderRow={(edge) => (
         <>
           <DtCell label="Version">{edge.versionId.slice(0, 8)}…</DtCell>

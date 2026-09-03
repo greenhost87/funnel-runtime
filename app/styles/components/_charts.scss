@@ -1,0 +1,30 @@
+.analytics-charts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.analytics-chart-panel {
+  margin-bottom: 0;
+}
+
+.analytics-chart-panel__canvas {
+  height: 18rem;
+}
+
+@media (min-width: 960px) {
+  .analytics-charts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .analytics-charts > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 479px) {
+  .analytics-chart-panel__canvas {
+    height: 16rem;
+  }
+}

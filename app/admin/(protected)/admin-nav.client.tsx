@@ -8,15 +8,19 @@ import {
   TrafficIcon,
   VersionsIcon,
 } from "@/components/ui/admin-nav-icons";
-import { AdminNavLogoutButton } from "@/components/ui/admin-nav-logout-button";
-import { AdminNavToggleButton } from "@/components/ui/admin-nav-toggle-button";
-import { AdminNavThemeToggle } from "@/components/ui/admin-nav-theme-toggle";
-import { AdminNav as AdminNavRoot } from "@/components/layout/admin/admin-nav";
-import { AdminNavFooter } from "@/components/layout/admin/admin-nav-footer";
-import { AdminNavIcon } from "@/components/layout/admin/admin-nav-icon";
-import { AdminNavItems } from "@/components/layout/admin/admin-nav-items";
-import { AdminNavLabel } from "@/components/layout/admin/admin-nav-label";
-import { AdminNavLink } from "@/components/layout/admin/admin-nav-link";
+import {
+  AdminNavLogoutButton,
+  AdminNavThemeToggle,
+  AdminNavToggleButton,
+} from "@/components/ui/action-buttons";
+import {
+  AdminNav as AdminNavRoot,
+  AdminNavFooter,
+  AdminNavIcon,
+  AdminNavItems,
+  AdminNavLabel,
+  AdminNavLink,
+} from "@/components/layout/admin-primitives";
 
 const MOBILE_NAV_QUERY = "(max-width: 479px)";
 

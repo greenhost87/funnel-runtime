@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
-import { AdminCardTitle } from "@/components/layout/admin-card-title";
-import { AnalyticsEmpty } from "@/components/layout/analytics/analytics-empty";
-import { AnalyticsTableWrap } from "@/components/layout/analytics/analytics-table-wrap";
+import { AdminCardTitle } from "@/components/layout/primitives";
+import { AnalyticsEmpty, AnalyticsTableWrap } from "@/components/layout/analytics-primitives";
 import { DtHeader, DtTable } from "@/components/ui/dt-table/dt-table";
 
 type AnalyticsTableSectionProps<TRow> = {

@@ -89,13 +89,17 @@ function seedAnalyticsScenario(db: ReturnType<typeof currentDatabase>) {
 describe("analytics service", () => {
   test("computes unique session metrics and primary conversion", () => {
     const db = currentDatabase();
-    createVersionService(db).publish(initialConfig);
+    const { versionId } = createVersionService(db).publish(initialConfig);
     seedAnalyticsScenario(db);
     const dashboard = createAnalyticsService(db).getDashboard();
     expect(dashboard.summary.sessionsStarted).toBe(2);
     expect(dashboard.summary.primaryCtaFromStartConversion).toBe(0.5);
     expect(dashboard.summary.resultReachRate).toBe(0.5);
     expect(dashboard.summary.ctaCtr).toBe(1);
+    expect(dashboard.sessionsByDay).toEqual([{ date: "2026-01-02", sessions: 2 }]);
+    expect(dashboard.stepFunnel).toEqual([
+      { versionId, variant: "A", stepId: "welcome", views: 1, completions: 1 },
+    ]);
   });
 
   test("filters by utm campaign without divide-by-zero", () => {
@@ -109,5 +113,25 @@ describe("analytics service", () => {
     const missing = createAnalyticsService(db).getDashboard({ utmCampaign: "missing" });
     expect(missing.summary.sessionsStarted).toBe(0);
     expect(missing.summary.primaryCtaFromStartConversion).toBeNull();
+  });
+
+  test("filters by variant and date range", () => {
+    const db = currentDatabase();
+    createVersionService(db).publish(initialConfig);
+    seedAnalyticsScenario(db);
+    const variantA = createAnalyticsService(db).getDashboard({ variant: "A" });
+    expect(variantA.summary.sessionsStarted).toBe(1);
+
+    const inRange = createAnalyticsService(db).getDashboard({
+      dateFrom: "2026-01-02",
+      dateTo: "2026-01-02",
+    });
+    expect(inRange.summary.sessionsStarted).toBe(2);
+
+    const outOfRange = createAnalyticsService(db).getDashboard({
+      dateFrom: "2026-01-03",
+      dateTo: "2026-01-03",
+    });
+    expect(outOfRange.summary.sessionsStarted).toBe(0);
   });
 });

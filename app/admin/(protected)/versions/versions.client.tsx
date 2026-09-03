@@ -1,16 +1,15 @@
 "use client";
 
 import { useState, type SyntheticEvent } from "react";
-import { PrimarySubmitButton } from "@/components/ui/primary-submit-button";
+import { PrimarySubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdminCard } from "@/components/layout/class-tagged";
 import { VersionsHistoryTable } from "@/app/components/versions/versions-history-table";
-import { AdminErrorList } from "@/components/layout/admin/admin-error-list";
-import { AdminCardTitle } from "@/components/layout/admin-card-title";
-import { AnalyticsEmpty } from "@/components/layout/analytics/analytics-empty";
-import { FormField } from "@/components/layout/form-field";
-import { readAdminErrors } from "@/app/admin/admin-api";
+import { AdminErrorList } from "@/components/layout/admin-primitives";
+import { AdminCardTitle, FormField } from "@/components/layout/primitives";
+import { AnalyticsEmpty } from "@/components/layout/analytics-primitives";
+import { readAdminErrors } from "@/app/admin/read-admin-errors";
 import { VersionsListResponseSchema } from "@/system/funnel/api-response.schema";
 import type { ActiveVersionSnapshot } from "@/system/versions/version.service";
 import { parseJsonFromReadable } from "@/system/http/json";

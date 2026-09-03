@@ -48,15 +48,14 @@ function selectControlView(ref: Ref<HTMLSelectElement>, props: SelectProps): Rea
   );
 }
 
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  props,
-  ref,
-): ReactNode {
-  const control = selectControlView(ref, props);
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(
+  function Select(props, ref): ReactNode {
+    const control = selectControlView(ref, props);
 
-  if (!props.label) {
-    return control;
-  }
+    if (!props.label) {
+      return control;
+    }
 
-  return selectFieldView(props.label, props.id, control);
-});
+    return selectFieldView(props.label, props.id, control);
+  },
+);

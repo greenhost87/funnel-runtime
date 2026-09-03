@@ -34,17 +34,18 @@ Open `http://localhost:3000` for the funnel and `/admin/login` for admin (passwo
 
 ## Commands
 
-| Command                                                | Purpose                             |
-| ------------------------------------------------------ | ----------------------------------- |
-| `bun run dev`                                          | Development server                  |
-| `bun run build`                                        | Production build                    |
-| `bun run typecheck`                                    | TypeScript check                    |
-| `bun run fmt` / `fmt:check`                            | Format with oxfmt                   |
-| `bun run migrate`                                      | Apply SQL migrations                |
-| `bun run seed`                                         | Idempotent initial config publish   |
-| `bun test`                                             | Unit/integration tests (`bun:test`) |
-| `bun run test:e2e`                                     | Playwright browser tests            |
-| `bun run generate:traffic -- --seed 42 --sessions 120` | Populate `SQLITE_PATH` with synthetic sessions for the admin dashboard |
+| Command                                                                 | Purpose                                                                                                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run dev`                                                           | Development server                                                                                                                                                                                                                                                                          |
+| `bun run build`                                                         | Production build                                                                                                                                                                                                                                                                            |
+| `bun run typecheck`                                                     | TypeScript check                                                                                                                                                                                                                                                                            |
+| `bun run fmt` / `fmt:check`                                             | Format with oxfmt                                                                                                                                                                                                                                                                           |
+| `bun run migrate`                                                       | Apply SQL migrations                                                                                                                                                                                                                                                                        |
+| `bun run seed`                                                          | Idempotent initial config publish                                                                                                                                                                                                                                                           |
+| `bun test`                                                              | Unit/integration tests (`bun:test`)                                                                                                                                                                                                                                                         |
+| `bun run test:e2e`                                                      | Playwright browser tests                                                                                                                                                                                                                                                                    |
+| `bun run generate:traffic -- --seed 42 --sessions 120`                  | Populate `SQLITE_PATH` with synthetic sessions for the admin dashboard. Supports `--versionId <id>` to target a specific version and `--withAlternative` to publish `alternative` alongside the active version; without flags all sessions go to the active version (avoids version sprawl) |
+| `bun run generate:traffic -- --versionId <id> --seed 42 --sessions 120` | Generate traffic for a pinned version (used by tests)                                                                                                                                                                                                                                       |
 
 ## Data model
 
@@ -88,7 +89,8 @@ Analytics uses **distinct session IDs** and trusted transition-linked completion
 - Primary metric (D3) = unique `cta_clicked` / unique `session_started`
 - Edge conversion = unique completions per immutable `from_step_id` → `to_step_id`/result
 - Drop-off = viewed step without completion for that step
-- Repeats, Back, duplicate IDs, and out-of-order timestamps do not inflate unique counts
+- Step funnel = breakdown by `versionId:variant:stepId` (see `system/analytics/analytics.service.ts#buildStepFunnel`), not a cross-version aggregate; `comparisons` and `edges` already provide per-version/variant views
+- Repeats, Back (`back_clicked` + distinct `step_viewed` with new `eventId`), duplicate IDs, and out-of-order timestamps do not inflate unique counts (`COUNT(DISTINCT session_id)`)
 
 ## A/B hypothesis
 
@@ -98,6 +100,8 @@ Analytics uses **distinct session IDs** and trusted transition-linked completion
 
 1. **First iteration:** Core runtime — dynamic funnel, versioning, events, analytics, admin, tests.
 2. **Second iteration:** Publish `iteration-2.json` via admin (conditional branch, B screen removal, `premium_interest_signal` event) without SQLite schema changes; verify old sessions stay pinned; rollback preserves analytics.
+
+**Version-scoped custom events:** `premium_interest_signal` (and `benefit_highlight_viewed`) are declared only in `fixtures/funnels/iteration-2.json` (`wellness-quiz-v2`). Sessions pinned to `wellness-quiz-v1` continue to work without error, but reporting `premium_interest_signal` from a `v1`-pinned `sessionId` is `rejected` as `Event not declared in pinned version <versionId>`; the event is accepted only on `wellness-quiz-v2` sessions.
 
 ## Known limitations
 

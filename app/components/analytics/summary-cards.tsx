@@ -2,9 +2,11 @@
 
 import type { AnalyticsSummary } from "@/system/analytics/analytics.service";
 import { AnalyticsCard } from "@/components/layout/class-tagged";
-import { AnalyticsCardLabel } from "@/components/layout/analytics/analytics-card-label";
-import { AnalyticsCardValue } from "@/components/layout/analytics/analytics-card-value";
-import { AnalyticsGrid } from "@/components/layout/analytics/analytics-grid";
+import {
+  AnalyticsCardLabel,
+  AnalyticsCardValue,
+  AnalyticsGrid,
+} from "@/components/layout/analytics-primitives";
 import { formatRate } from "@/app/components/analytics/analytics-table-section";
 
 export function SummaryCards({ summary }: { summary: AnalyticsSummary }) {

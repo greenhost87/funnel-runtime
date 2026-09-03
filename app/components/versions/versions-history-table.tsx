@@ -1,11 +1,10 @@
 "use client";
 
-import { SecondaryActionButton } from "@/components/ui/secondary-action-button";
-import { StatusTag } from "@/components/ui/status-tag";
-import { VersionsHistoryRow } from "@/components/layout/admin/versions-history-row";
+import { SecondaryActionButton } from "@/components/ui/action-buttons";
+import { StatusTag } from "@/components/ui/primitives";
+import { VersionsHistoryRow } from "@/components/layout/admin-primitives";
 import { DtCell, DtHeader, DtTable } from "@/components/ui/dt-table/dt-table";
-import { AnalyticsEmpty } from "@/components/layout/analytics/analytics-empty";
-import { AnalyticsTableWrap } from "@/components/layout/analytics/analytics-table-wrap";
+import { AnalyticsEmpty, AnalyticsTableWrap } from "@/components/layout/analytics-primitives";
 
 type HistoryItem = {
   activationId: number;

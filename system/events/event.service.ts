@@ -36,9 +36,13 @@ export function createEventService(db: Database) {
     return items.map((item) => processOne(item));
   }
 
-  function validateEventName(item: BatchEventInput, customEvents: Set<string>): string | null {
+  function validateEventName(
+    item: BatchEventInput,
+    customEvents: Set<string>,
+    versionId: string,
+  ): string | null {
     if (!BUILT_IN_EVENT_SET.has(item.eventName) && !customEvents.has(item.eventName)) {
-      return "Event not declared in config";
+      return `Event not declared in pinned version ${versionId}`;
     }
     return null;
   }
@@ -117,7 +121,11 @@ export function createEventService(db: Database) {
     }
 
     const config = versions.getConfigByVersionId(session.version_id);
-    const eventNameError = validateEventName(item, new Set(config.customEvents ?? []));
+    const eventNameError = validateEventName(
+      item,
+      new Set(config.customEvents ?? []),
+      session.version_id,
+    );
     if (eventNameError) {
       return reject(item.eventId, eventNameError);
     }

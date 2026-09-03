@@ -3,15 +3,16 @@ import type { Database } from "bun:sqlite";
 import { isNodeEnvironment } from "@/system/config/environment";
 import { advanceInfo, goBack, restoreState, submitAnswer } from "@/system/funnel/funnel-engine";
 import type { AdvanceResult } from "@/system/funnel/funnel-engine";
-import type { EffectiveFunnelConfig, FunnelSessionState, StepAnswer } from "@/system/funnel/config.types";
+import type {
+  EffectiveFunnelConfig,
+  FunnelSessionState,
+  StepAnswer,
+} from "@/system/funnel/config.types";
 import { validateAnswer } from "@/system/funnel/answer-validation";
 import type { FunnelApiState, MutationResponse } from "@/system/funnel/api-response.schema";
 import { jsonResponse } from "@/system/http/json";
 import { SessionStateConflictError } from "@/system/database/sessions/session.dao";
-import {
-  createSessionService,
-  type SessionSnapshot,
-} from "@/system/sessions/session.service";
+import { createSessionService, type SessionSnapshot } from "@/system/sessions/session.service";
 import { createVersionService } from "@/system/versions/version.service";
 import { cookies } from "next/headers";
 
@@ -187,7 +188,8 @@ export function handleAnswerMutation(
   return runForwardMutation(
     db,
     sessionId,
-    (effectiveConfig, currentState) => submitAnswer(effectiveConfig, currentState, stepId, validation.value),
+    (effectiveConfig, currentState) =>
+      submitAnswer(effectiveConfig, currentState, stepId, validation.value),
     "Invalid answer mutation",
   );
 }

@@ -1,7 +1,4 @@
-import {
-  BatchEventItemSchema,
-  BatchEventResponseSchema,
-} from "@/system/events/event.schema";
+import { BatchEventItemSchema, BatchEventResponseSchema } from "@/system/events/event.schema";
 import type { BatchEventInput, BatchEventResult } from "@/system/events/event.types";
 import type { EventProperties } from "@/system/events/event-properties.schema";
 import { parseJsonFromReadable } from "@/system/http/json";

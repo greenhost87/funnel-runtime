@@ -2,14 +2,16 @@
 
 import { useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
-import { PrimarySubmitButton } from "@/components/ui/primary-submit-button";
+import { PrimarySubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AdminCardTitle } from "@/components/layout/admin-card-title";
-import { AdminLogin } from "@/components/layout/admin-login";
-import { FormError } from "@/components/layout/form-error";
-import { FormField } from "@/components/layout/form-field";
-import { PageShell } from "@/components/layout/page-shell";
+import {
+  AdminCardTitle,
+  AdminLogin,
+  FormError,
+  FormField,
+  PageShell,
+} from "@/components/layout/primitives";
 
 export default function AdminLoginPage() {
   const router = useRouter();

@@ -18,12 +18,7 @@ export type EventProperties = v.InferOutput<typeof EventPropertiesSchema>;
 
 const FORBIDDEN_PROPERTY_KEYS = ["answer", "answers", "rawAnswer", "rawAnswers", "value"];
 
-const PrimitiveEventPropertyValueSchema = v.union([
-  v.string(),
-  v.number(),
-  v.boolean(),
-  v.null(),
-]);
+const PrimitiveEventPropertyValueSchema = v.union([v.string(), v.number(), v.boolean(), v.null()]);
 
 function joinPropertyPath(path: string, segment: string): string {
   return path ? `${path}.${segment}` : segment;

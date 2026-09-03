@@ -2,8 +2,7 @@ import type { Database } from "bun:sqlite";
 import { FunnelConfigSchema, parseFunnelConfig } from "@/system/funnel/config.schema";
 import type { FunnelConfig } from "@/system/funnel/config.types";
 import { createVersionDao, type VersionRow } from "@/system/database/versions/version.dao";
-import type { JsonValue } from "@/system/http/json-value.types";
-import { parseJsonString } from "@/system/http/json";
+import { parseJsonString, type JsonValue } from "@/system/http/json";
 
 export type ActiveVersionSnapshot = {
   versionId: string;

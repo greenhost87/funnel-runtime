@@ -29,14 +29,34 @@ describe("generate-traffic command", () => {
     expect(generatedSessions).toBe(120);
     expect(dashboard.summary.sessionsStarted).toBe(120);
     expect(dashboard.summary.primaryCtaFromStartConversion).toBeCloseTo(0.2916666666666667, 10);
-    expect(dashboard.summary.resultReachRate).toBeCloseTo(0.475, 10);
-    expect(dashboard.summary.ctaCtr).toBeCloseTo(0.6140350877192983, 10);
+    expect(dashboard.summary.resultReachRate).toBeCloseTo(0.45, 10);
+    expect(dashboard.summary.ctaCtr).toBeCloseTo(0.6481481481481481, 10);
 
     const versionIds = new Set(dashboard.comparisons.map((row) => row.versionId));
     expect(versionIds.size).toBe(1);
     expect(versionIds.has(initial.versionId)).toBe(true);
     expect(dashboard.comparisons.reduce((total, row) => total + row.started, 0)).toBe(120);
     expect(dashboard.campaigns.length).toBeGreaterThan(0);
+  });
+
+  test("anchors generated events to the requested date", () => {
+    const db = currentDatabase();
+    const versions = createVersionService(db);
+    const initial = versions.publish(initialConfig);
+
+    generateSyntheticTraffic(db, {
+      versionId: initial.versionId,
+      sessionCount: 120,
+      seed: 42,
+      anchorDate: "2025-06-15",
+    });
+
+    const dashboard = createAnalyticsService(db).getDashboard({
+      dateFrom: "2025-06-15",
+      dateTo: "2025-06-15",
+    });
+    expect(dashboard.summary.sessionsStarted).toBe(120);
+    expect(dashboard.sessionsByDay).toEqual([{ date: "2025-06-15", sessions: 120 }]);
   });
 
   test("prints dashboard instructions when run as a command", async () => {

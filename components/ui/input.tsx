@@ -1,4 +1,10 @@
-import { forwardRef, type ChangeEvent, type FocusEvent, type MouseEvent, type ReactNode } from "react";
+import {
+  forwardRef,
+  type ChangeEvent,
+  type FocusEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 
 type InputVariant = "default" | "form" | "file";
 

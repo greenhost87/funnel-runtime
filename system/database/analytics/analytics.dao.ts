@@ -5,6 +5,10 @@ import { FUNNEL_VARIANTS, type FunnelVariant } from "@/system/funnel/config.type
 
 export type AnalyticsFilters = {
   utmCampaign?: string;
+  variant?: FunnelVariant;
+  versionId?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 type CompletionEdgeRow = {
@@ -38,6 +42,11 @@ type VersionVariantBreakdownRow = {
   resultViewed: number;
 };
 
+type SessionsByDayRow = {
+  date: string;
+  sessions: number;
+};
+
 const CompletionEdgeRowSchema = v.object({
   versionId: v.string(),
   variant: v.picklist(FUNNEL_VARIANTS),
@@ -69,19 +78,45 @@ const VersionVariantBreakdownRowSchema = v.object({
   resultViewed: v.number(),
 });
 
+const SessionsByDayRowSchema = v.object({
+  date: v.string(),
+  sessions: v.number(),
+});
+
 const CountRowSchema = v.object({
   count: v.number(),
 });
 
-function campaignClause(
+function filterClause(
   alias: string,
   filters: AnalyticsFilters,
 ): { clause: string; params: string[] } {
-  if (!filters.utmCampaign) {
-    return { clause: "", params: [] };
-  }
   const prefix = alias ? `${alias}.` : "";
-  return { clause: `AND ${prefix}utm_campaign = ?`, params: [filters.utmCampaign] };
+  const parts: string[] = [];
+  const params: string[] = [];
+
+  if (filters.utmCampaign) {
+    parts.push(`AND ${prefix}utm_campaign = ?`);
+    params.push(filters.utmCampaign);
+  }
+  if (filters.variant) {
+    parts.push(`AND ${prefix}variant = ?`);
+    params.push(filters.variant);
+  }
+  if (filters.versionId) {
+    parts.push(`AND ${prefix}version_id = ?`);
+    params.push(filters.versionId);
+  }
+  if (filters.dateFrom) {
+    parts.push(`AND DATE(${prefix}client_timestamp) >= ?`);
+    params.push(filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    parts.push(`AND DATE(${prefix}client_timestamp) <= ?`);
+    params.push(filters.dateTo);
+  }
+
+  return { clause: parts.join(" "), params };
 }
 
 function mapCompletionEdgeRow(
@@ -104,14 +139,16 @@ export function createAnalyticsDao(db: Database) {
     sql: string,
     filters: AnalyticsFilters,
   ): v.InferOutput<TSchema>[] {
-    const { clause, params } = campaignClause(alias, filters);
+    const { clause, params } = filterClause(alias, filters);
     return readRows(db, sql.replace("{{clause}}", clause), params, schema);
   }
 
   function countDistinctEvent(eventName: string, filters: AnalyticsFilters): number {
-    const { clause, params } = campaignClause("", filters);
+    const { clause, params } = filterClause("", filters);
     const row = db
-      .query(`SELECT COUNT(DISTINCT session_id) AS count FROM events WHERE event_name = ? ${clause}`)
+      .query(
+        `SELECT COUNT(DISTINCT session_id) AS count FROM events WHERE event_name = ? ${clause}`,
+      )
       .get(eventName, ...params);
     const parsed = v.safeParse(CountRowSchema, row);
     return parsed.success ? parsed.output.count : 0;
@@ -188,14 +225,34 @@ export function createAnalyticsDao(db: Database) {
     );
   }
 
+  function listSessionsStartedByDay(filters: AnalyticsFilters): SessionsByDayRow[] {
+    return listAggregated(
+      SessionsByDayRowSchema,
+      "e",
+      `
+        SELECT DATE(e.client_timestamp) AS date,
+               COUNT(DISTINCT e.session_id) AS sessions
+        FROM events e
+        WHERE e.event_name = 'session_started' {{clause}}
+        GROUP BY DATE(e.client_timestamp)
+        ORDER BY date
+      `,
+      filters,
+    );
+  }
+
   return {
-    countDistinctSessionsStarted: (filters: AnalyticsFilters) => countDistinctEvent("session_started", filters),
+    countDistinctSessionsStarted: (filters: AnalyticsFilters) =>
+      countDistinctEvent("session_started", filters),
     countDistinctSessionsWithEvent: countDistinctEvent,
-    countDistinctSessionsReachedResult: (filters: AnalyticsFilters) => countDistinctEvent("result_viewed", filters),
-    countDistinctSessionsWithCta: (filters: AnalyticsFilters) => countDistinctEvent("cta_clicked", filters),
+    countDistinctSessionsReachedResult: (filters: AnalyticsFilters) =>
+      countDistinctEvent("result_viewed", filters),
+    countDistinctSessionsWithCta: (filters: AnalyticsFilters) =>
+      countDistinctEvent("cta_clicked", filters),
     listCompletionEdges,
     listStepViews,
     listCompletionsByFromStep,
     listVersionVariantBreakdown,
+    listSessionsStartedByDay,
   };
 }

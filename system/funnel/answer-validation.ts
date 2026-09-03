@@ -68,6 +68,9 @@ function validateNumber(
   step: Extract<FunnelStep, { type: "number" }>,
   raw: StepAnswer | undefined,
 ): ValidationResult {
+  if (raw === null) {
+    return { valid: false, error: "Number is required" };
+  }
   const value = typeof raw === "string" ? Number(raw) : raw;
   if (typeof value !== "number" || Number.isNaN(value)) {
     return { valid: false, error: "Answer must be a number" };
@@ -77,9 +80,6 @@ function validateNumber(
   }
   if (step.max !== undefined && value > step.max) {
     return { valid: false, error: `Value must be at most ${step.max}` };
-  }
-  if (step.required !== false && raw === null) {
-    return { valid: false, error: "Number is required" };
   }
   return { valid: true, value };
 }

@@ -32,7 +32,9 @@ async function expectCenteredInNav(page: Page, selector: string) {
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth,
+  );
   expect(overflow).toBe(false);
 }
 
@@ -92,7 +94,9 @@ test.describe("admin mobile layout at 320px", () => {
     await adminLogin(page);
     await page.goto("/admin/traffic");
     await page.getByRole("button", { name: "Generate traffic" }).click();
-    await expect(page.getByText(/Generated \d+ synthetic sessions\./)).toBeVisible();
+    await expect(
+      page.getByText(/Generated \d+ synthetic sessions for \d{4}-\d{2}-\d{2}\./),
+    ).toBeVisible();
 
     await page.goto("/admin/analytics");
     await expect(page.getByText("Primary metric: CTA-from-start conversion")).toBeVisible();

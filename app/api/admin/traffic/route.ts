@@ -27,6 +27,7 @@ export async function POST(request: Request) {
   const { generatedSessions } = generateSyntheticTraffic(getDatabase(), {
     versionId: body.versionId,
     sessionCount,
+    anchorDate: body.date,
   });
 
   return jsonResponse({ generatedSessions });

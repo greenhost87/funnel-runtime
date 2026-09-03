@@ -1,3 +1,4 @@
+import * as v from "valibot";
 import type {
   AnswerCondition,
   AnswerValue,
@@ -6,6 +7,7 @@ import type {
   FunnelStep,
   FunnelVariant,
   ResultConfig,
+  TransitionTarget,
 } from "./config.types";
 
 function applyTextOverrides(
@@ -32,13 +34,7 @@ function resolveStepOrder(config: FunnelConfig, variant: FunnelVariant): string[
     return baseOrder;
   }
 
-  const ordered = override.stepOrder.filter((id) => !excluded.has(id));
-  for (const id of baseOrder) {
-    if (!ordered.includes(id)) {
-      ordered.push(id);
-    }
-  }
-  return ordered;
+  return override.stepOrder.filter((id) => !excluded.has(id));
 }
 
 function buildEffectiveSteps(config: FunnelConfig, variant: FunnelVariant): FunnelStep[] {
@@ -64,15 +60,37 @@ function buildEffectiveResult(config: FunnelConfig, variant: FunnelVariant): Res
   };
 }
 
+function isTransitionTargetValid(target: TransitionTarget, stepIds: Set<string>): boolean {
+  return target.type === "result" || stepIds.has(target.stepId);
+}
+
 function validateEffectiveTransitions(steps: FunnelStep[]): void {
   const stepIds = new Set(steps.map((step) => step.id));
   for (const step of steps) {
-    for (const transition of step.transitions) {
-      if (transition.target.type === "step" && !stepIds.has(transition.target.stepId)) {
-        throw new Error(
-          `Variant override leaves broken transition from ${step.id} to ${transition.target.stepId}`,
+    const defaultTransitions = step.transitions.filter((transition) => !transition.when);
+    if (defaultTransitions.length > 0) {
+      const hasValidDefault = defaultTransitions.some((transition) =>
+        isTransitionTargetValid(transition.target, stepIds),
+      );
+      if (!hasValidDefault) {
+        const broken = defaultTransitions.find(
+          (transition) =>
+            transition.target.type === "step" && !stepIds.has(transition.target.stepId),
         );
+        if (broken?.target.type === "step") {
+          throw new Error(
+            `Variant override leaves broken transition from ${step.id} to ${broken.target.stepId}`,
+          );
+        }
+        throw new Error(`Variant override leaves step ${step.id} with no valid default transition`);
       }
+      continue;
+    }
+    const hasValid = step.transitions.some((transition) =>
+      isTransitionTargetValid(transition.target, stepIds),
+    );
+    if (!hasValid) {
+      throw new Error(`Variant override leaves step ${step.id} with no valid transitions`);
     }
   }
 }
@@ -109,8 +127,16 @@ export function matchesCondition(
   switch (condition.op) {
     case "equals":
       return answer === condition.value;
-    case "in":
-      return typeof answer === "string" && condition.values.includes(answer);
+    case "in": {
+      if (typeof answer === "string") {
+        return condition.values.includes(answer);
+      }
+      const parsed = v.safeParse(v.array(v.string()), answer);
+      if (parsed.success) {
+        return parsed.output.some((value) => condition.values.includes(value));
+      }
+      return false;
+    }
     case "gte":
       return typeof answer === "number" && answer >= condition.value;
     case "lte":

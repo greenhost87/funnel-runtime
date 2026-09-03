@@ -94,9 +94,12 @@ export const LoginRequestSchema = v.object({
   password: v.string(),
 });
 
+const TrafficDateSchema = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/));
+
 export const TrafficGenerateRequestSchema = v.object({
   versionId: v.string(),
   sessions: v.optional(v.pipe(v.number(), v.integer(), v.minValue(100))),
+  date: v.optional(TrafficDateSchema),
 });
 
 export const TrafficGenerateResponseSchema = v.object({

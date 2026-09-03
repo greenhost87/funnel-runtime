@@ -18,12 +18,6 @@ export function DtHeader({ columns }: { columns: readonly string[] }) {
   );
 }
 
-export function DtTable({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
+export function DtTable({ className, children }: { className?: string; children: ReactNode }) {
   return <div className={joinClassNames("dt", className)}>{children}</div>;
 }

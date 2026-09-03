@@ -111,7 +111,10 @@ export function createSessionService(db: Database) {
     return toSnapshot(row);
   }
 
-  function createOrRestore(sessionId: string | null, options: CreateSessionOptions): SessionSnapshot {
+  function createOrRestore(
+    sessionId: string | null,
+    options: CreateSessionOptions,
+  ): SessionSnapshot {
     if (sessionId) {
       const existing = sessions.getById(sessionId);
       if (existing) {

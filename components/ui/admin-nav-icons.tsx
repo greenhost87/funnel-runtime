@@ -11,7 +11,14 @@ type AdminNavStrokeIconProps = {
 
 function AdminNavStrokeIcon({ className, children }: AdminNavStrokeIconProps) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
       {children}
     </svg>
   );

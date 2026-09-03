@@ -26,13 +26,7 @@ function labelClassName(
     .join(" ");
 }
 
-export function Label({
-  variant = "form",
-  selected,
-  className,
-  children,
-  ...props
-}: LabelProps) {
+export function Label({ variant = "form", selected, className, children, ...props }: LabelProps) {
   return (
     <label className={labelClassName(variant, selected, className)} {...props}>
       {children}

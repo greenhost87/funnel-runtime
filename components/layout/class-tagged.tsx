@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
-import type { AdminCardProps, AnalyticsCardProps, FunnelConfigErrorProps, FunnelDescriptionProps, LayoutCardSurfaceProps } from "@/components/layout/html-props";
+import type {
+  AdminCardProps,
+  AnalyticsCardProps,
+  FunnelConfigErrorProps,
+  FunnelDescriptionProps,
+  LayoutCardSurfaceProps,
+} from "@/components/layout/html-props";
 
 type LayoutTagName = "section" | "div" | "p" | "span";
 
@@ -94,7 +100,10 @@ function createConditionalCard(baseClass: string, modifierClass: string) {
 }
 
 const adminCardTagged = createClassTagged("box admin-card", "section");
-const funnelConfigErrorTagged = createClassTagged("notification is-danger funnel__config-error", "p");
+const funnelConfigErrorTagged = createClassTagged(
+  "notification is-danger funnel__config-error",
+  "p",
+);
 const funnelDescriptionTagged = createClassTagged("funnel__description", "p");
 const AnalyticsCardView = createConditionalCard("box analytics-card", "analytics-card--primary");
 

@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import initialConfig from "@/fixtures/funnels/initial.json";
 import alternativeConfig from "@/fixtures/funnels/alternative.json";
+import iteration2Config from "@/fixtures/funnels/iteration-2.json";
 import { parseFunnelConfig } from "@/system/funnel/config.schema";
 import { resolveEffectiveConfig } from "@/system/funnel/variant-resolver";
-import type { JsonValue } from "@/system/http/json-value.types";
+import type { JsonValue } from "@/system/http/json";
 
 function expectInvalidConfig(input: JsonValue): void {
   expect(() => parseFunnelConfig(input)).toThrow();
@@ -78,5 +79,18 @@ describe("funnel config contract", () => {
       },
     };
     expect(() => parseFunnelConfig(broken)).toThrow(/Variant B effective config invalid/);
+  });
+
+  test("iteration-2 B has exact 5 steps without tail", () => {
+    const config = parseFunnelConfig(iteration2Config);
+    const variantB = resolveEffectiveConfig(config, "B");
+    expect(variantB.steps.map((step) => step.id)).toEqual([
+      "goal",
+      "timeline",
+      "habits",
+      "budget",
+      "summary",
+    ]);
+    expect(variantB.steps.length).toBe(5);
   });
 });

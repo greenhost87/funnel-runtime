@@ -2,19 +2,30 @@
 
 import Link from "next/link";
 import { useState, type SyntheticEvent } from "react";
-import { PrimarySubmitButton } from "@/components/ui/primary-submit-button";
-import { Input } from "@/components/ui/input";
+import { PrimarySubmitButton } from "@/components/ui/action-buttons";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
-import { Option } from "@/components/ui/option";
+import { Option } from "@/components/ui/primitives";
 import { Select } from "@/components/ui/select";
 import { AdminCard } from "@/components/layout/class-tagged";
-import { AdminErrorList } from "@/components/layout/admin/admin-error-list";
-import { AdminCardTitle } from "@/components/layout/admin-card-title";
-import { AnalyticsEmpty } from "@/components/layout/analytics/analytics-empty";
-import { FormField } from "@/components/layout/form-field";
-import { readAdminErrors } from "@/app/admin/admin-api";
+import { AdminErrorList } from "@/components/layout/admin-primitives";
+import { AdminCardTitle, FormField } from "@/components/layout/primitives";
+import { AnalyticsEmpty } from "@/components/layout/analytics-primitives";
+import { readAdminErrors } from "@/app/admin/read-admin-errors";
 import { TrafficGenerateResponseSchema } from "@/system/funnel/api-response.schema";
 import { parseJsonFromReadable } from "@/system/http/json";
+
+const SESSION_PRESETS = [
+  { value: 100, label: "100 — smoke test" },
+  { value: 250, label: "250 — light load" },
+  { value: 500, label: "500 — medium load" },
+  { value: 1000, label: "1,000 — heavy load" },
+  { value: 2000, label: "2,000 — stress test" },
+] as const;
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 type VersionOption = {
   versionId: string;
@@ -44,6 +55,13 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
       return;
     }
 
+    const date = formData.get("date");
+    if (typeof date !== "string" || date.length === 0) {
+      setErrors(["Event date is required"]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setErrors([]);
     setMessage(null);
@@ -53,7 +71,8 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         versionId,
-        sessions: Number(formData.get("sessions")),
+        sessions: Number(formData.get("sessionPreset")),
+        date,
       }),
     });
 
@@ -65,7 +84,7 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
     }
 
     const payload = await parseJsonFromReadable(response, TrafficGenerateResponseSchema);
-    setMessage(`Generated ${payload.generatedSessions} synthetic sessions.`);
+    setMessage(`Generated ${payload.generatedSessions} synthetic sessions for ${date}.`);
   }
 
   if (versions.length === 0) {
@@ -96,7 +115,12 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
         >
           <FormField>
             <Label htmlFor="versionId">Funnel version</Label>
-            <Select id="versionId" name="versionId" defaultValue={activeVersionId ?? versions[0]?.versionId} required>
+            <Select
+              id="versionId"
+              name="versionId"
+              defaultValue={activeVersionId ?? versions[0]?.versionId}
+              required
+            >
               {versions.map((version) => (
                 <Option key={version.versionId} value={version.versionId}>
                   {version.configId}
@@ -106,8 +130,18 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
             </Select>
           </FormField>
           <FormField>
-            <Label htmlFor="sessions">Sessions (min 100)</Label>
-            <Input id="sessions" name="sessions" type="number" defaultValue={120} min={100} required />
+            <Label htmlFor="sessionPreset">Volume</Label>
+            <Select id="sessionPreset" name="sessionPreset" defaultValue={500} required>
+              {SESSION_PRESETS.map((preset) => (
+                <Option key={preset.value} value={preset.value}>
+                  {preset.label}
+                </Option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField>
+            <Label htmlFor="date">Event date</Label>
+            <DateInput id="date" name="date" defaultValue={todayIsoDate()} required />
           </FormField>
           <PrimarySubmitButton loading={loading} loadingLabel="Generating…">
             Generate traffic

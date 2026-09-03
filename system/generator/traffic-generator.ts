@@ -1,34 +1,34 @@
 import type { Database } from "bun:sqlite";
-import type { EffectiveFunnelConfig, FunnelSessionState, FunnelStep } from "@/system/funnel/config.types";
+import type {
+  EffectiveFunnelConfig,
+  FunnelSessionState,
+  FunnelStep,
+} from "@/system/funnel/config.types";
 import { createEventService } from "@/system/events/event.service";
 import type { BatchEventInput } from "@/system/events/event.types";
 import { advanceInfo, createInitialState, submitAnswer } from "@/system/funnel/funnel-engine";
 import type { AdvanceResult } from "@/system/funnel/funnel-engine";
 import { createSessionService, type SessionSnapshot } from "@/system/sessions/session.service";
 import { createVersionService } from "@/system/versions/version.service";
-
 export type GenerateSyntheticTrafficOptions = {
   versionId: string;
   sessionCount: number;
   seed?: number;
+  anchorDate?: string;
 };
-
 export type GenerateSyntheticTrafficResult = {
   generatedSessions: number;
 };
-
 type RandomFn = () => number;
-
 type SessionService = ReturnType<typeof createSessionService>;
-
 type BuildSessionEventsInput = {
   sessions: SessionService;
   session: SessionSnapshot;
   config: EffectiveFunnelConfig;
   index: number;
   random: RandomFn;
+  anchorMs: number;
 };
-
 type AdvanceSessionStepInput = {
   sessions: SessionService;
   sessionId: string;
@@ -39,23 +39,20 @@ type AdvanceSessionStepInput = {
   stepsWalked: number;
   random: RandomFn;
   batch: BatchEventInput[];
+  anchorMs: number;
 };
-
 type SessionWalkResult = {
   state: FunnelSessionState;
   stepsWalked: number;
 };
-
 const CAMPAIGNS = ["spring", "summer", "launch", "autumn", "winter", "referral"];
 const SEEDED_CAMPAIGNS = ["spring", "summer", "launch"];
-
 function pickCampaign(index: number, random: RandomFn, seeded: boolean): string {
   if (seeded) {
     return SEEDED_CAMPAIGNS[index % SEEDED_CAMPAIGNS.length] ?? "spring";
   }
   return CAMPAIGNS[Math.floor(random() * CAMPAIGNS.length)] ?? "spring";
 }
-
 function createSeededRandom(seed: number): RandomFn {
   let state = seed;
   return () => {
@@ -63,20 +60,28 @@ function createSeededRandom(seed: number): RandomFn {
     return state / 4294967296;
   };
 }
-
+function resolveAnchorMs(anchorDate?: string): number {
+  if (!anchorDate) {
+    return Date.now();
+  }
+  const parsed = new Date(`${anchorDate}T12:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return Date.now();
+  }
+  return parsed.getTime();
+}
 export function generateSyntheticTraffic(
   db: Database,
   options: GenerateSyntheticTrafficOptions,
 ): GenerateSyntheticTrafficResult {
   const versions = createVersionService(db);
   versions.getConfigByVersionId(options.versionId);
-
   const sessions = createSessionService(db);
   const events = createEventService(db);
   const random = options.seed === undefined ? Math.random : createSeededRandom(options.seed);
   const seeded = options.seed !== undefined;
+  const anchorMs = resolveAnchorMs(options.anchorDate);
   let generatedSessions = 0;
-
   for (let index = 0; index < options.sessionCount; index += 1) {
     const variant = random() < 0.5 ? "A" : "B";
     const campaign = pickCampaign(index, random, seeded);
@@ -85,7 +90,6 @@ export function generateSyntheticTraffic(
       variantOverride: variant,
       utm: { utmCampaign: campaign, utmSource: "generator", utmMedium: "synthetic" },
     });
-
     const config = sessions.getEffectiveConfigForSession(session.sessionId);
     const batch = buildSessionEvents({
       sessions,
@@ -93,49 +97,50 @@ export function generateSyntheticTraffic(
       config,
       index,
       random,
+      anchorMs,
     });
     if (!batch) {
       continue;
     }
-
     deliverEventBatch(events, batch, index);
     generatedSessions += 1;
   }
-
   return { generatedSessions };
 }
-
 function buildSessionEvents(input: BuildSessionEventsInput): BatchEventInput[] | null {
   const startedId = input.session.pendingSessionStartedEventId;
   if (!startedId) {
     return null;
   }
-
   let state = createInitialState(input.config);
   const batch: BatchEventInput[] = [
     {
       eventId: startedId,
       eventName: "session_started",
       sessionId: input.session.sessionId,
-      clientTimestamp: new Date(Date.now() + input.index).toISOString(),
+      clientTimestamp: new Date(input.anchorMs + input.index).toISOString(),
     },
   ];
-
   const dropAfterSteps = Math.floor(input.random() * 6);
   let stepsWalked = 0;
-
+  let hasInjectedBack = false;
   while (!state.isResult && state.currentStepId) {
     const step = input.config.steps.find((item) => item.id === state.currentStepId);
     if (!step) {
       break;
     }
-
-    batch.push(createStepViewedEvent(input.session.sessionId, step.id, input.index, stepsWalked));
-
+    batch.push(
+      createStepViewedEvent(
+        input.session.sessionId,
+        step.id,
+        input.index,
+        stepsWalked,
+        input.anchorMs,
+      ),
+    );
     if (stepsWalked >= dropAfterSteps && input.random() < 0.25) {
       break;
     }
-
     const walked = advanceSessionStep({
       sessions: input.sessions,
       sessionId: input.session.sessionId,
@@ -146,109 +151,211 @@ function buildSessionEvents(input: BuildSessionEventsInput): BatchEventInput[] |
       stepsWalked,
       random: input.random,
       batch,
+      anchorMs: input.anchorMs,
     });
     state = walked.state;
     stepsWalked = walked.stepsWalked;
-
+    hasInjectedBack = maybeInjectBack(
+      batch,
+      input.session.sessionId,
+      state,
+      step.id,
+      stepsWalked,
+      hasInjectedBack,
+      input.random,
+      input.anchorMs,
+      input.index,
+    );
     if (state.isResult) {
-      appendResultEvents(batch, input.session.sessionId, input.index, stepsWalked, input.random);
+      appendResultEvents(
+        batch,
+        input.session.sessionId,
+        input.index,
+        stepsWalked,
+        input.random,
+        input.anchorMs,
+      );
     }
   }
-
   return batch;
 }
-
+function maybeInjectBack(
+  batch: BatchEventInput[],
+  sessionId: string,
+  state: FunnelSessionState,
+  stepId: string,
+  stepsWalked: number,
+  hasInjectedBack: boolean,
+  random: RandomFn,
+  anchorMs: number,
+  index: number,
+): boolean {
+  if (
+    !hasInjectedBack &&
+    !state.isResult &&
+    state.currentStepId &&
+    stepsWalked >= 2 &&
+    stepsWalked <= 3 &&
+    random() < 0.12
+  ) {
+    const previousStepId = state.history[state.history.length - 2] ?? stepId;
+    batch.push({
+      eventId: crypto.randomUUID(),
+      eventName: "back_clicked",
+      sessionId,
+      clientTimestamp: new Date(anchorMs + index + stepsWalked + 0.25).toISOString(),
+      stepId: state.currentStepId,
+    });
+    batch.push({
+      eventId: crypto.randomUUID(),
+      eventName: "step_viewed",
+      sessionId,
+      clientTimestamp: new Date(anchorMs + index + stepsWalked + 0.26).toISOString(),
+      stepId: previousStepId,
+    });
+    return true;
+  }
+  return hasInjectedBack;
+}
 function createStepViewedEvent(
   sessionId: string,
   stepId: string,
   index: number,
   stepsWalked: number,
+  anchorMs: number,
 ): BatchEventInput {
   return {
     eventId: crypto.randomUUID(),
     eventName: "step_viewed",
     sessionId,
-    clientTimestamp: new Date(Date.now() + index + stepsWalked).toISOString(),
+    clientTimestamp: new Date(anchorMs + index + stepsWalked).toISOString(),
     stepId,
   };
 }
-
-function advanceSessionStep(input: AdvanceSessionStepInput): SessionWalkResult {
-  if (input.step.type === "info") {
-    const advanced = advanceInfo(input.config, input.state);
-    const { transitionId } = applyAdvancedTransition(
-      input.sessions,
-      input.sessionId,
-      input.state,
-      advanced,
-    );
-    appendStepCompleted(input, transitionId);
-    return { state: advanced.state, stepsWalked: input.stepsWalked + 1 };
-  }
-
-  const answer = pickStepAnswer(input.step, input.random);
-  const advanced = submitAnswer(input.config, input.state, input.step.id, answer);
+function finalizeTransition(input: AdvanceSessionStepInput, advanced: AdvanceResult): string {
   const { transitionId } = applyAdvancedTransition(
     input.sessions,
     input.sessionId,
     input.state,
     advanced,
   );
-  input.batch.push({
-    eventId: crypto.randomUUID(),
-    eventName: "answer_submitted",
-    sessionId: input.sessionId,
-    clientTimestamp: new Date(Date.now() + input.index + input.stepsWalked + 0.1).toISOString(),
-    stepId: input.step.id,
-  });
   appendStepCompleted(input, transitionId);
-  return { state: advanced.state, stepsWalked: input.stepsWalked + 1 };
+  return transitionId;
 }
-
+function advanceSessionStep(input: AdvanceSessionStepInput): SessionWalkResult {
+  try {
+    let advanced: AdvanceResult;
+    if (input.step.type === "info") {
+      advanced = advanceInfo(input.config, input.state);
+    } else {
+      const answer = pickValidAnswer(input.config, input.step, input.random);
+      advanced = submitAnswer(input.config, input.state, input.step.id, answer);
+      input.batch.push({
+        eventId: crypto.randomUUID(),
+        eventName: "answer_submitted",
+        sessionId: input.sessionId,
+        clientTimestamp: new Date(
+          input.anchorMs + input.index + input.stepsWalked + 0.1,
+        ).toISOString(),
+        stepId: input.step.id,
+      });
+    }
+    finalizeTransition(input, advanced);
+    return { state: advanced.state, stepsWalked: input.stepsWalked + 1 };
+  } catch {
+    return { state: input.state, stepsWalked: input.stepsWalked };
+  }
+}
 function appendStepCompleted(input: AdvanceSessionStepInput, transitionId: string) {
   input.batch.push({
     eventId: crypto.randomUUID(),
     eventName: "step_completed",
     sessionId: input.sessionId,
-    clientTimestamp: new Date(Date.now() + input.index + input.stepsWalked + 0.2).toISOString(),
+    clientTimestamp: new Date(input.anchorMs + input.index + input.stepsWalked + 0.2).toISOString(),
     stepId: input.step.id,
     transitionId,
   });
 }
-
 function pickStepAnswer(step: FunnelStep, random: RandomFn) {
   if (step.type === "single-select") {
-    return step.options[Math.floor(random() * step.options.length)]?.id ?? step.options[0]?.id ?? "energy";
+    return (
+      step.options[Math.floor(random() * step.options.length)]?.id ??
+      step.options[0]?.id ??
+      "energy"
+    );
   }
   if (step.type === "multi-select") {
     return [step.options[0]?.id ?? "nutrition"];
   }
   return Math.floor(random() * 500);
 }
-
+function pickValidAnswer(config: EffectiveFunnelConfig, step: FunnelStep, random: RandomFn) {
+  if (step.type !== "single-select") {
+    return pickStepAnswer(step, random);
+  }
+  const stepIds = new Set(config.steps.map((item) => item.id));
+  const validOptions = step.options.filter((option) => {
+    const answer = option.id;
+    let target: { type: "step"; stepId: string } | { type: "result" } | null = null;
+    for (const transition of step.transitions) {
+      if (!transition.when) {
+        target = transition.target;
+        continue;
+      }
+      const condition = transition.when;
+      let matches = false;
+      if (condition.op === "equals") {
+        matches = answer === condition.value;
+      } else if (condition.op === "in") {
+        matches = condition.values.includes(answer);
+      }
+      if (matches) {
+        target = transition.target;
+        break;
+      }
+    }
+    if (!target) {
+      const fallback = step.transitions.find((item) => !item.when)?.target;
+      target = fallback ?? null;
+    }
+    if (!target) {
+      return false;
+    }
+    if (target.type === "result") {
+      return true;
+    }
+    return stepIds.has(target.stepId);
+  });
+  if (validOptions.length === 0) {
+    return pickStepAnswer(step, random);
+  }
+  return (
+    validOptions[Math.floor(random() * validOptions.length)]?.id ?? validOptions[0]?.id ?? "energy"
+  );
+}
 function appendResultEvents(
   batch: BatchEventInput[],
   sessionId: string,
   index: number,
   stepsWalked: number,
   random: RandomFn,
+  anchorMs: number,
 ) {
   batch.push({
     eventId: crypto.randomUUID(),
     eventName: "result_viewed",
     sessionId,
-    clientTimestamp: new Date(Date.now() + index + stepsWalked + 0.3).toISOString(),
+    clientTimestamp: new Date(anchorMs + index + stepsWalked + 0.3).toISOString(),
   });
   if (random() < 0.6) {
     batch.push({
       eventId: crypto.randomUUID(),
       eventName: "cta_clicked",
       sessionId,
-      clientTimestamp: new Date(Date.now() + index + stepsWalked + 0.4).toISOString(),
+      clientTimestamp: new Date(anchorMs + index + stepsWalked + 0.4).toISOString(),
     });
   }
 }
-
 function applyAdvancedTransition(
   sessions: ReturnType<typeof createSessionService>,
   sessionId: string,
@@ -271,7 +378,6 @@ function applyAdvancedTransition(
     { currentStepId: state.currentStepId, isResult: state.isResult },
   );
 }
-
 function deliverEventBatch(
   events: ReturnType<typeof createEventService>,
   batch: BatchEventInput[],

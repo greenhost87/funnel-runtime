@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createEnv, getBooleanEnv, getPositiveIntegerEnv } from "@/system/config/environment";
-import { resolveE2ePort } from "@/system/net/e2e-server";
+import { resolveE2ePort } from "@/system/net";
 
 const tempDir = mkdtempSync(join(tmpdir(), "funnel-e2e-"));
 const dbPath = join(tempDir, "e2e.sqlite");

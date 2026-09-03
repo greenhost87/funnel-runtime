@@ -11,7 +11,9 @@ const TableRowSchema = v.object({
 describe("database migrations", () => {
   test("applies migrations on isolated sqlite template", () => {
     const db = currentDatabase();
-    const rows = db.query(`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`).all();
+    const rows = db
+      .query(`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`)
+      .all();
     const tables = rows.flatMap((row) => {
       const parsed = v.safeParse(TableRowSchema, row);
       return parsed.success ? [parsed.output] : [];

@@ -23,7 +23,9 @@ function themeLabel(theme: Theme): string {
 }
 
 function themeToggleClassName(className: string | undefined, collapsed: boolean): string {
-  return ["button", "is-small", collapsed ? "" : "is-fullwidth", className].filter(Boolean).join(" ");
+  return ["button", "is-small", collapsed ? "" : "is-fullwidth", className]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function themeToggleLabel(theme: Theme, collapsed: boolean): string {
