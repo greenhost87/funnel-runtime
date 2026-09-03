@@ -1,0 +1,123 @@
+{
+  "id": "wellness-quiz-v2",
+  "name": "Personal Wellness Plan Quiz v2",
+  "customEvents": ["benefit_highlight_viewed", "premium_interest_signal"],
+  "steps": [
+    {
+      "id": "welcome",
+      "type": "info",
+      "title": "Discover your personalized wellness roadmap",
+      "description": "Answer a few thoughtful questions and we will craft a plan tailored to your lifestyle, goals, and current habits.",
+      "transitions": [{ "id": "welcome-next", "target": { "type": "step", "stepId": "goal" } }]
+    },
+    {
+      "id": "goal",
+      "type": "single-select",
+      "title": "What is your primary wellness goal for the next 90 days?",
+      "required": true,
+      "options": [
+        { "id": "energy", "label": "Boost daily energy and focus" },
+        { "id": "stress", "label": "Reduce stress and improve sleep" },
+        { "id": "fitness", "label": "Build strength and endurance" },
+        { "id": "premium", "label": "Premium coaching program" }
+      ],
+      "transitions": [
+        {
+          "id": "goal-premium",
+          "when": { "op": "equals", "value": "premium" },
+          "target": { "type": "step", "stepId": "premium-details" }
+        },
+        {
+          "id": "goal-fitness",
+          "when": { "op": "equals", "value": "fitness" },
+          "target": { "type": "step", "stepId": "training-frequency" }
+        },
+        { "id": "goal-default", "target": { "type": "step", "stepId": "habits" } }
+      ]
+    },
+    {
+      "id": "premium-details",
+      "type": "info",
+      "title": "Premium coaching overview",
+      "description": "One-on-one coaching with weekly check-ins and personalized meal and training plans.",
+      "transitions": [{ "id": "premium-next", "target": { "type": "step", "stepId": "budget" } }]
+    },
+    {
+      "id": "training-frequency",
+      "type": "single-select",
+      "title": "How often do you currently exercise?",
+      "required": true,
+      "options": [
+        { "id": "rarely", "label": "Rarely or never" },
+        { "id": "1-2", "label": "1–2 times per week" },
+        { "id": "3plus", "label": "3+ times per week" }
+      ],
+      "transitions": [{ "id": "training-next", "target": { "type": "step", "stepId": "habits" } }]
+    },
+    {
+      "id": "habits",
+      "type": "multi-select",
+      "title": "Which habits would you like to improve?",
+      "minSelections": 1,
+      "options": [
+        { "id": "nutrition", "label": "Nutrition and meal planning" },
+        { "id": "sleep", "label": "Sleep routine" },
+        { "id": "movement", "label": "Daily movement" },
+        { "id": "mindfulness", "label": "Mindfulness practice" }
+      ],
+      "transitions": [{ "id": "habits-next", "target": { "type": "step", "stepId": "budget" } }]
+    },
+    {
+      "id": "budget",
+      "type": "number",
+      "title": "Monthly budget for wellness products and services (USD)",
+      "min": 0,
+      "max": 1000,
+      "required": true,
+      "transitions": [{ "id": "budget-next", "target": { "type": "step", "stepId": "timeline" } }]
+    },
+    {
+      "id": "timeline",
+      "type": "single-select",
+      "title": "When would you like to see meaningful results?",
+      "required": true,
+      "options": [
+        { "id": "2weeks", "label": "Within 2 weeks" },
+        { "id": "1month", "label": "Within 1 month" },
+        { "id": "3months", "label": "Within 3 months" }
+      ],
+      "transitions": [{ "id": "timeline-next", "target": { "type": "step", "stepId": "summary" } }]
+    },
+    {
+      "id": "summary",
+      "type": "info",
+      "title": "Almost there — review your answers",
+      "description": "We will use your responses to generate a step-by-step wellness plan.",
+      "transitions": [{ "id": "summary-result", "target": { "type": "result" } }]
+    }
+  ],
+  "result": {
+    "title": "Your comprehensive wellness plan is ready",
+    "body": "Based on your goals and preferences, we prepared a detailed roadmap with weekly milestones.",
+    "cta": {
+      "label": "Get my full plan",
+      "url": "https://example.com/wellness/plan-v2"
+    }
+  },
+  "variants": {
+    "A": {},
+    "B": {
+      "excludedStepIds": ["welcome"],
+      "stepOrder": ["goal", "timeline", "habits", "budget", "summary"],
+      "stepTextOverrides": {
+        "goal": { "title": "Pick your #1 goal" },
+        "summary": { "title": "Ready?" }
+      },
+      "result": {
+        "title": "Your fast-track wellness wins",
+        "body": "3 high-impact actions you can start today.",
+        "cta": { "label": "Start quick wins", "url": "https://example.com/wellness/quick-v2" }
+      }
+    }
+  }
+}

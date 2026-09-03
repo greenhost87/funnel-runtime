@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.next-e2e/
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env
+.env.local
+test-results/
+playwright-report/
+coverage/

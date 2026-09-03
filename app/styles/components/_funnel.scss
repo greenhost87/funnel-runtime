@@ -1,0 +1,120 @@
+.funnel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.funnel__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.funnel__title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  word-wrap: break-word;
+}
+
+.funnel__description {
+  color: var(--color-text-muted);
+  word-wrap: break-word;
+}
+
+.funnel__progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.funnel__progress-bar {
+  height: 0.5rem;
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.funnel__progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 0.2s ease;
+}
+
+.funnel__progress-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.funnel__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.funnel__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+  word-wrap: break-word;
+}
+
+.funnel__option:hover {
+  border-color: var(--color-primary);
+}
+
+.funnel__option--selected {
+  border-color: var(--color-primary);
+  background: #eff6ff;
+}
+
+.funnel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.funnel__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.funnel__result-title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+}
+
+.funnel__result-body {
+  color: var(--color-text-muted);
+  word-wrap: break-word;
+}
+
+.funnel__config-error {
+  padding: var(--space-4);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
+  background: #fef2f2;
+}
+
+.funnel__loading {
+  color: var(--color-text-muted);
+  padding: var(--space-6) 0;
+}
+
+@media (max-width: 320px) {
+  .funnel__controls {
+    flex-direction: column;
+  }
+
+  .funnel__controls .btn {
+    width: 100%;
+  }
+}

@@ -1,0 +1,143 @@
+# Plan
+
+## Requirements
+
+- D1: Утверждённое пользователем решение — проект остаётся Bun-first: install, scripts, runtime и SQLite используют Bun и `bun:sqlite`; расхождение с формулировкой исходного задания про Node.js осознанно принято и не считается блокером этого плана.
+- D2: Утверждённое пользователем решение — deployment не входит в этот план; public URL и persistent production storage остаются отдельным известным handoff-блокером `TBD`, который будет снят только отдельным решением пользователя.
+- D3: Утверждённое пользователем решение — отсутствующие в репозитории исходные JSON-конфиги заменяются самостоятельно созданными вымышленными fixtures; A/B-гипотеза варианта B состоит в снижении трения за счёт более коротких текстов, ранней подачи low-friction вопросов, изменённого порядка и benefit-oriented result, а primary metric равна `unique sessions with cta_clicked / unique sessions with session_started`.
+- R1: Этап 0 — создать чистый single-repository scaffold на Next.js App Router, React, strict TypeScript и Bun; запуск, сборка, скрипты и package lifecycle выполняются через Bun. `beglarian-phoenix` используется только как архитектурный ориентир для структуры `app`/`system`/`http`, без переноса его предметного кода, PostgreSQL, Bun SQL, Telegram/Shopify-интеграций, авторизации и тестов.
+- R2: Этап 0 — создать управляемую SCSS-систему по образцу Phoenix: единая точка подключения, tokens, reset, layout, elements и отдельные component partials; стили используют зафиксированное именование классов, не смешиваются с бизнес-логикой и сохраняют работоспособность при ширине 320 px.
+- R3: Этап 1 — определить версионируемый JSON-контракт воронки и его Valibot-валидацию: не менее шести экранов, типы `single-select`, `multi-select`, `number`, `info`, result/CTA, правила ответов, условные переходы, вариантные изменения текста/порядка/исключённых шагов/result и список дополнительных событий. Самостоятельно создать два валидных локальных вымышленных конфига взамен отсутствующих исходных файлов; initial variant B обязан реализовать D3 и наблюдаемо менять текст, порядок шагов и экран результата относительно A.
+- R4: Этап 1 — реализовать чистый доменный движок, который по неизменяемому конфигу, варианту и ответам разрешает эффективные шаги, проверяет ответ, выбирает следующий шаг/result, строит историю Back и считает прогресс только по доступному пути. Движок не читает HTTP, cookies или SQLite и одинаково используется backend, frontend и генератором.
+- R5: Этап 1 — создать SQLite lifecycle на встроенном `bun:sqlite`: подключение, WAL/foreign keys, последовательные неизменяемые SQL-миграции и команды migrate/seed. Первая миграция хранит immutable версии конфигов, историю активаций, закреплённые сессии, immutable факты фактических переходов и события с уникальным `event_id`; приложение не требует внешней БД или ручного изменения схемы.
+- R6: Этап 2 — реализовать version repository/service: первая и повторная публикация валидного JSON атомарно создают immutable версию и запись активации; active version читается из последней записи истории; rollback добавляет новую запись активации предыдущей версии, не удаляя версии, сессии или аналитику.
+- R7: Этап 2 — реализовать session repository/service: постоянная cookie содержит только session ID, а SQLite хранит pinned version, pinned variant, исходные UTM, ответы, текущий шаг, историю и backend-generated `session_started` event ID с durable pending/recorded state. Новая сессия получает текущую active version и backend-assigned A/B 50/50; query override применяется только при явном создании новой сессии; существующая сессия после refresh, повторного открытия, публикации или rollback продолжает pinned version и variant. Пока `session_started` не принят event service, любой create/restore response возвращает тот же pending event ID; после приёма он больше не возвращается как pending.
+- R8: Этап 2 — защитить `/admin` и `/api/admin/*` локальной авторизацией без внешнего сервиса: пароль и ключ подписи берутся из environment, успешный вход создаёт подписанную httpOnly cookie с ограниченным сроком, logout её удаляет, а неавторизованные HTML/API-запросы получают предсказуемый redirect/401.
+- R9: Этап 2 — создать внутреннюю страницу версий и admin API: показать active version и историю, принять только выбранный локальный JSON-файл, показать ошибки схемы до публикации, опубликовать новую версию без redeploy и выполнить rollback по истории активаций.
+- R10: Этап 3 — создать funnel session API, которое создаёт или восстанавливает cookie-сессию, загружает строго pinned config, возвращает effective config/variant/version/state/pending `session_started` event и принимает answer/info-advance/back mutations с серверной валидацией и атомарным сохранением состояния. Успешные answer и info-advance mutations атомарно создают immutable forward transition с `transition_id`, `from_step_id` и `to_step_id` либо result target и возвращают этот ID клиенту; Back не выдаёт forward transition.
+- R11: Этап 3 — реализовать batch event schema, repository, service и endpoint для обязательных `session_started`, `step_viewed`, `answer_submitted`, `step_completed`, `back_clicked`, `result_viewed`, `cta_clicked` и объявленных конфигом дополнительных событий. Каждая сохранённая запись содержит `event_id`, `session_id`, server/client timestamps, pinned version/variant, nullable `step_id`, UTM и безопасные event properties; `step_completed` дополнительно обязан ссылаться на `transition_id`. Backend обогащает доверенные поля из сессии и immutable transition, не сохраняет raw answers в событиях, отклоняет transition другой сессии/шага или уже связанный с другим completion, дедуплицирует по `event_id`, атомарно помечает соответствующий `session_started` как recorded при accepted или duplicate результате, возвращает результат каждого элемента и принимает валидные элементы даже при ошибках соседних.
+- R12: Этап 3 — создать generic frontend renderer без захардкоженных экранов воронки: registry поддерживаемых типов отображает effective config, общие controls показывают validation errors и CTA, а неизвестный тип даёт контролируемую ошибку конфигурации вместо падения страницы.
+- R13: Этап 3 — связать renderer с session API и event endpoint: Next/Back, refresh и повторное открытие восстанавливают серверное состояние; прогресс пересчитывается движком. Frontend отправляет возвращённый session API pending `session_started` с выданным backend event ID до подтверждённого accepted/duplicate результата; restore после потерянного create response повторяет тот же ID. Вход на каждый обычный шаг отправляет `step_viewed`; подтверждённый ответ отправляет одной пачкой `answer_submitted` без значения ответа и `step_completed` с выданным `transition_id`; Next на `info` вызывает info-advance и отправляет только `step_completed` с его `transition_id`; Back отправляет `back_clicked`; вход на result отправляет `result_viewed`; primary CTA перед переходом отправляет `cta_clicked`. Каждый из остальных event intents получает стабильный UUID, а повтор после timeout использует тот же UUID.
+- R14: Этап 4 — реализовать analytics DAO/service на уникальных session IDs и множестве доверенных фактов, а не порядке получения событий: started, D3 primary CTA-from-start conversion, edge conversion по сохранённым `from_step_id`/`to_step_id` каждого принятого completion, step drop-off как viewed без completion, result reach, CTA CTR, сравнение A/B и версий, фильтр по UTM campaign. Повторные просмотры, Back, разные event IDs одного типа, дубли `event_id`, неоднозначные графы и out-of-order timestamps не изменяют уникальные показатели.
+- R15: Этап 4 — создать защищённый analytics API и dashboard: summary с D3 primary metric, граф/таблица переходов и отвалов, result/CTA, срезы A/B и версий, UTM campaign filter; пустые выборки и ветвящиеся варианты отображаются без деления на ноль или смешивания разных рёбер.
+- R16: Этап 4 — добавить детерминированную Bun-команду генерации минимум 100 синтетических сессий по двум версиям и вариантам A/B с несколькими UTM campaign, обеими ветками, разными drop-off, повторными событиями, повторной отправкой batch и out-of-order событиями; итоговый набор имеет заранее проверяемые агрегаты.
+- R17: Этап 5 — провести вторую итерацию отдельным JSON-конфигом без изменения schema SQLite: добавить условную ветку и новое событие, исключить один экран в варианте B, опубликовать через тот же admin flow, доказать продолжение старой сессии на старой версии, запуск новой на новой версии, сохранение аналитики и корректный rollback.
+- R18: Этап 5 — покрыть согласованный scope автоматикой на `bun:test` и Playwright: закрепление версии, стабильность/override варианта, наблюдаемые различия текста/порядка/result между A и B, immutable transition identity, info completion без answer, восстановление pending `session_started` после потерянного ответа, дедупликация и partial batch acceptance, полный набор и моменты отправки семи обязательных событий, публикация/rollback, основные агрегаты, полный пользовательский flow с refresh/Back/веткой и admin flow публикации второй итерации. Каждый database test получает изолированную временную SQLite.
+- R19: Этап 6 — создать GitHub CI только для проверки и сборки проекта: frozen install, format check, typecheck, `bun:test`, production build и Playwright. CI не выполняет deploy; способ получения публичного URL и persistent production storage остаётся явно отмеченным `TBD` до решения с постановщиком задания.
+- R20: Этап 6 — подготовить README как сдаваемый контракт: локальный запуск, environment, migrate/seed, тесты, генератор, модель данных, config/event schemas, правила идемпотентности и агрегации, утверждённые D1-D3 с точной формулой primary metric, timeline первой/второй итераций и известные ограничения; D1 и D2 описываются как осознанно принятые решения, а не как незамеченные соответствия исходному заданию.
+- R21: Этап 6 — подготовить финальный handoff checklist со ссылкой на репозиторий, ссылкой на работающий публичный URL, ссылкой на README и результатами CI. Repository URL должен быть заполнен до передачи; public URL остаётся блокирующим `TBD` до отдельного решения с постановщиком.
+
+## Affected Artifacts
+
+- [R1, R18, R19] `package.json` (`scripts`, dependencies) - закрепить Next/React/TypeScript/Bun, Valibot, Sass, oxfmt и Playwright; команды должны разделять dev, build, typecheck, format, migrate, seed, tests и traffic generation.
+- [R1] `bun.lock` - фиксировать полный dependency graph без второго package manager.
+- [R1] `tsconfig.json` - перенести только применимые strict-настройки Phoenix, включая path alias и `noUncheckedIndexedAccess`.
+- [R1] `next.config.ts` - задать минимальную Next-конфигурацию без Phoenix-specific rewrites, images и Bun SQL external package.
+- [R1, R5, R8] `.env.example` - перечислить SQLite path, app URL, admin password и signing secret без реальных значений.
+- [R1, R2] `app/layout.tsx` (`RootLayout`) - подключить metadata и единственный SCSS entrypoint.
+- [R1, R12, R13] `app/page.tsx` - оставить server entrypoint тонким и передать пользовательский flow клиентскому coordinator.
+- [R2] `app/styles/main.scss` - импортировать SCSS-слои в фиксированном порядке.
+- [R2] `app/styles/_tokens.scss` - владеть цветами, spacing, typography, radii и breakpoints.
+- [R2] `app/styles/_reset.scss` - владеть нормализацией базовых элементов.
+- [R2] `app/styles/_layout.scss` - владеть page shells, content widths и responsive layout.
+- [R2, R8] `app/styles/elements/_forms.scss` - владеть общими input, select, validation и file-input состояниями.
+- [R2, R9, R12] `app/styles/elements/_buttons.scss` - владеть button/CTA variants и focus/disabled состояниями.
+- [R2, R12, R13] `app/styles/components/_funnel.scss` - владеть screen, option list, progress, result и mobile layout.
+- [R2, R8, R9] `app/styles/components/_admin.scss` - владеть login, version history и publication layout.
+- [R2, R15] `app/styles/components/_analytics.scss` - владеть metric cards, filters и responsive tables/edge presentation.
+- [R3] `system/funnel/config.types.ts` - владеть TypeScript discriminated unions конфигурации, steps, transitions, variants, result и custom events.
+- [R3] `system/funnel/config.schema.ts` (`FunnelConfigSchema`, `parseFunnelConfig`) - валидировать структуру, уникальность ID, ссылки переходов, обязательные result/CTA и допустимые variant overrides.
+- [R3, R16] `fixtures/funnels/initial.json` - предоставить самостоятельно созданную замену отсутствующего первого config с A/B и веткой; B реализует D3 и наблюдаемо меняет текст, порядок шагов и result относительно A.
+- [R3, R16] `fixtures/funnels/alternative.json` - предоставить самостоятельно созданную замену отсутствующего второго config для публикации и version comparison.
+- [R4] `system/funnel/variant-resolver.ts` - строить effective immutable config для A или B и проверять, что overrides не оставляют битые переходы.
+- [R4] `system/funnel/answer-validation.ts` - валидировать ответ только по типу и constraints текущего effective step.
+- [R4, R7, R10, R13, R14, R16] `system/funnel/funnel-engine.ts` - владеть переходом к next/result, доступным путём, visited history и progress без persistence concerns.
+- [R3, R4] `tests/funnel/config.test.ts` - проверять оба fixture config, битые ссылки, variant removal и неизвестные типы.
+- [R4, R18] `tests/funnel/funnel-engine.test.ts` - проверять обе ветки, validation, Back, variant-specific path/progress и разрешённые различия текста/порядка/result между A и B.
+- [R5] `system/database/connection.ts` - владеть process-local `bun:sqlite` connection, pragmas и lifecycle.
+- [R5] `system/database/migrate.ts` - применять SQL-файлы по ledger строго один раз и в порядке имени.
+- [R5, R7, R10, R11] `migrations/0001_initial.sql` - создать migration ledger, `funnel_versions`, `funnel_activation_history`, `sessions` с durable `session_started` state, `session_transitions` и `events` с целостностью transition linkage и индексами для session/version/variant/UTM analytics.
+- [R5] `scripts/migrate.ts` - предоставить Bun entrypoint миграций.
+- [R3, R5, R6] `scripts/seed.ts` - идемпотентно опубликовать initial fixture только в пустой базе.
+- [R5, R18] `tests/setup/test-database.ts` - создавать изолированную временную SQLite, применять production migrations и гарантировать cleanup.
+- [R5] `tests/database/migrate.test.ts` - доказывать повторяемость migrate и отсутствие ручной schema setup.
+- [R6] `system/database/versions/version.dao.ts` - владеть SQL чтения immutable versions, active activation и activation history.
+- [R6, R9] `system/versions/version.service.ts` - координировать parse, publication transaction, active lookup и history-based rollback.
+- [R6, R18] `tests/versions/version.service.test.ts` - проверять publish, immutable snapshots, последовательную историю и rollback без удаления данных.
+- [R7, R11] `system/database/sessions/session.dao.ts` - владеть SQL создания/чтения сессии, durable pending/recorded `session_started` state, атомарным mark-recorded для соответствующего event ID и optimistic atomic update session state.
+- [R10, R11, R14] `system/database/sessions/session-transition.dao.ts` - владеть immutable forward transition insert/read и проверкой принадлежности `transition_id` конкретным session/from/to/version/variant.
+- [R7, R10, R13] `system/sessions/session.service.ts` - координировать active version lookup, variant assignment/override, UTM capture и pinned state restoration; создавать и повторно возвращать backend-generated pending `session_started` event ID до его подтверждённой записи.
+- [R7, R18] `tests/sessions/session.service.test.ts` - проверять version pinning, A/B stability, explicit new-session override, сохранение состояния после смены active version и стабильность pending `session_started` ID после потерянного create response.
+- [R8] `system/auth/admin-session.ts` - владеть password verification, signed cookie creation/verification и expiry.
+- [R8] `system/auth/require-admin.ts` - предоставить отдельные guards для server page и route handler.
+- [R8] `app/admin/login/page.tsx` - отображать login form и безопасную общую ошибку.
+- [R8] `app/api/admin/login/route.ts` - валидировать пароль и устанавливать admin cookie.
+- [R8] `app/api/admin/logout/route.ts` - удалять admin cookie.
+- [R8, R9, R15] `app/admin/layout.tsx` - защищать весь admin subtree и предоставлять минимальную навигацию versions/analytics/logout.
+- [R8] `tests/auth/admin-session.test.ts` - проверять valid, invalid, expired и tampered cookies.
+- [R9] `app/api/admin/versions/route.ts` - GET возвращает active/history, POST принимает multipart JSON file, валидирует и публикует.
+- [R9] `app/api/admin/versions/rollback/route.ts` - выполнять только history-based rollback и возвращать новый active snapshot.
+- [R9] `app/admin/versions/page.tsx` - загрузить initial admin state на сервере.
+- [R9] `app/admin/versions/versions.client.tsx` - владеть file-only publication form, validation feedback, active card, history и rollback interaction.
+- [R7, R10] `app/api/funnel/session/route.ts` - создавать/восстанавливать сессию, устанавливать persistent cookie и возвращать pinned effective state вместе с тем же pending `session_started` intent до его записи.
+- [R10] `app/api/funnel/answer/route.ts` - принимать answer mutation, проверять current step, атомарно сохранять новый state и возвращать immutable forward `transition_id`.
+- [R10] `app/api/funnel/advance/route.ts` - разрешать Next только для current `info` step, атомарно сохранять следующий state и возвращать immutable forward `transition_id` без создания answer.
+- [R10] `app/api/funnel/back/route.ts` - восстанавливать предыдущий доступный step из server history.
+- [R10, R13] `system/funnel/funnel-response.types.ts` - владеть serializable API contract между session routes и frontend, включая pending `session_started` intent и forward `transition_id` answer/info responses.
+- [R7, R10, R13] `tests/app/funnel-session-api.test.ts` - проверять create/restore, потерю create response с повторной выдачей того же pending event ID, invalid answer, info advance без answer event, Back, immutable forward transitions и pinned config response на уровне route handlers.
+- [R11] `system/events/event.types.ts` - владеть точным набором семи обязательных event names, обязательным `transition_id` для `step_completed`, batch input и per-item result contracts.
+- [R11] `system/events/event.schema.ts` - валидировать каждый batch item независимо, запрещать raw answer fields, требовать `transition_id` только для `step_completed` и разрешать custom event только из pinned config.
+- [R11] `system/database/events/event.dao.ts` - выполнять idempotent insert по primary key и distinct-fact reads, не доверяя version/variant/UTM из клиента.
+- [R11, R13, R16] `system/events/event.service.ts` - независимо обрабатывать batch items, разрешать trusted edge через immutable transition, атомарно закрывать pending `session_started`, обогащать server fields и возвращать accepted/duplicate/rejected статусы.
+- [R11] `app/api/events/route.ts` - ограничиться parse, service call и единым batch response.
+- [R11, R18] `tests/events/event.service.test.ts` - проверять приём каждого из семи обязательных типов, stable pending `session_started`, duplicate ID, repeated batch, partial invalid batch, trusted transition enrichment, отклонение чужого/несовпадающего transition, config-declared custom event, отклонение необъявленного события и отсутствие raw answers.
+- [R12] `app/components/funnel/screen-renderer.tsx` - выбирать renderer только по discriminated `step.type` и обрабатывать unsupported type.
+- [R12] `app/components/funnel/single-select-screen.tsx` - владеть single-select presentation.
+- [R12] `app/components/funnel/multi-select-screen.tsx` - владеть multi-select presentation.
+- [R12] `app/components/funnel/number-screen.tsx` - владеть numeric input presentation.
+- [R12] `app/components/funnel/info-screen.tsx` - владеть informational presentation.
+- [R12] `app/components/funnel/result-screen.tsx` - владеть result и primary CTA presentation.
+- [R12, R13] `app/components/funnel/funnel-controls.tsx` - владеть Next/Back controls и доступностью состояний.
+- [R12, R13] `app/components/funnel/funnel-progress.tsx` - отображать рассчитанный доступный progress без собственной route logic.
+- [R13] `app/components/funnel/funnel.client.tsx` - быть единственным browser coordinator для загрузки session state, mutations и выбора presentational view.
+- [R13] `app/components/funnel/use-funnel-controller.ts` - владеть client state transitions, pending/error states, синхронизацией server responses, повтором pending `session_started`, answer completion с transition ID и отдельным info completion без `answer_submitted`.
+- [R13] `app/components/funnel/event-client.ts` - создавать UUID, отправлять batches и повторять timeout с исходными IDs.
+- [R14] `system/database/analytics/analytics.dao.ts` - возвращать distinct session/event facts и accepted completion edges через join с immutable transitions, применяя optional campaign predicate без расчёта UI-модели.
+- [R14, R15] `system/analytics/analytics.service.ts` - строить summary/version/variant/campaign metrics и D3 primary metric по trusted transition facts с безопасными denominators, не выводя edge из порядка или простого совместного присутствия step events.
+- [R14, R18] `tests/analytics/analytics.service.test.ts` - фиксировать ожидаемые started, D3 primary metric, trusted edge conversion, info-step completion/drop-off, result reach и CTA CTR при ambiguous graph, duplicates, Back и out-of-order данных.
+- [R15] `app/api/admin/analytics/route.ts` - валидировать campaign filter и возвращать защищённую analytics model.
+- [R15] `app/admin/analytics/page.tsx` - загружать initial analytics model на сервере.
+- [R15] `app/admin/analytics/analytics.client.tsx` - владеть campaign filter и обновлением dashboard.
+- [R15] `app/components/analytics/summary-cards.tsx` - показывать started/result/CTA metrics и явно выделять D3 primary CTA-from-start conversion.
+- [R15] `app/components/analytics/edge-table.tsx` - показывать version/variant-specific edge conversion и drop-off.
+- [R15] `app/components/analytics/comparison-table.tsx` - показывать сравнение A/B и versions.
+- [R16] `scripts/generate-traffic.ts` - детерминированно создавать версии, сессии и batches через production services, печатать seed/run ID и ожидаемый summary.
+- [R16] `tests/generator/generate-traffic.test.ts` - проверять минимум 100 сессий, обязательные типы аномалий и совпадение dashboard summary с ожидаемым.
+- [R17] `fixtures/funnels/iteration-2.json` - владеть второй итерацией: дополнительная ветка, variant B removal и custom event без schema migration.
+- [R17, R18] `tests/e2e/funnel-runtime.spec.ts` - на браузерном уровне проверять dynamic flow, validation, branch, refresh, Back, info completion без answer, CTA, наблюдаемые различия текста/порядка/result вариантов A/B, transition IDs, точные network payload и моменты отправки всех семи обязательных событий, повтор pending `session_started` после потерянного create response и отсутствие повтора после accepted/duplicate, admin login/file publication, old/new sessions, iteration-2 custom event, rollback и сохранённый dashboard.
+- [R18] `playwright.config.ts` - запускать production-like isolated app с временной SQLite и контролируемым environment.
+- [R18] `scripts/start-e2e.ts` - мигрировать/seed временную SQLite, поднять Next через Bun и корректно завершить процессы.
+- [R19] `.github/workflows/ci.yml` - выполнять frozen Bun install, format, typecheck, unit/integration tests, build и Playwright без deployment job.
+- [R20] `README.md` - содержать весь эксплуатационный, архитектурный, продуктовый и сдаваемый контекст, включая D1-D3, формулу primary CTA-from-start conversion и явно выделенный public URL/persistent storage TBD.
+- [R21] `DELIVERY.md` - владеть финальным checklist и фактическими repository/README/public URL/CI links, не выдавая public URL за готовый до снятия `TBD`.
+
+## Verification
+
+- [R1, R2] `rtk bun install --frozen-lockfile`, `rtk bun run typecheck`, `rtk bun run build` - независимые команды подтверждают, что чистый scaffold устанавливается и собирается Bun; browser check из `tests/e2e/funnel-runtime.spec.ts` подтверждает отсутствие horizontal overflow и доступность controls при 320 px.
+- [R3] `rtk test bun test tests/funnel/config.test.ts` - обе самостоятельно созданные замены отсутствующих JSON проходят контракт, initial B реализует D3 и отличается текстом, порядком и result, а структурно битые и variant-broken конфиги отклоняются.
+- [R4] `rtk test bun test tests/funnel/funnel-engine.test.ts` - чистый движок доказывает validation, обе ветки, Back и доступный progress для A/B.
+- [R5] `rtk test bun test tests/database/migrate.test.ts` - новая и уже мигрированная временная SQLite получают одну и ту же schema без внешнего сервиса и ручных действий.
+- [R6] `rtk test bun test tests/versions/version.service.test.ts` - публикация, active lookup, immutable snapshots и history rollback соответствуют R6.
+- [R7] `rtk test bun test tests/sessions/session.service.test.ts` - старая сессия сохраняет version/variant/state, новая получает active version, override действует только для новой сессии, а restore до event acceptance возвращает исходный pending `session_started` ID.
+- [R8] `rtk test bun test tests/auth/admin-session.test.ts` - admin cookie нельзя подделать или использовать после expiry; observable checks `/admin` redirect и `/api/admin/*` 401 входят в browser/API suites.
+- [R9, R10] `rtk test bun test tests/app/funnel-session-api.test.ts`, `rtk test bun run test:e2e -- --grep "publication|session"` - независимые проверки подтверждают file publication/rollback, create/restore, answer/info/back mutations и immutable transition IDs через публичные route contracts.
+- [R11] `rtk test bun test tests/events/event.service.test.ts` - endpoint/service принимает все семь обязательных типов и config-declared custom event, закрывает соответствующий pending `session_started` после accepted/duplicate, отклоняет необъявленное событие и invalid transition linkage, безопасно обрабатывает mixed batch, дедуплицирует retries и сохраняет полные trusted envelopes без raw answers.
+- [R12, R13] `rtk test bun run test:e2e -- --grep "dynamic funnel|event emission|experiment variants"` - generic UI проходит все типы экранов, validation, обе A/B-композиции, ветку, progress, refresh, Back, result и CTA; наблюдение network requests подтверждает `step_completed` без `answer_submitted` для info, transition IDs, точные триггеры семи событий и отсутствие второго `session_started` после его подтверждённой записи.
+- [R14] `rtk test bun test tests/analytics/analytics.service.test.ts` - trusted transition facts подтверждают уникальные edge/drop-off/result/CTR и D3 primary агрегаты независимо от неоднозначного графа, дублей и порядка.
+- [R15] `rtk test bun run test:e2e -- --grep "analytics"` - dashboard отображает D3 primary metric, A/B, versions и campaign-filtered metrics без ошибок на пустых/ветвящихся данных.
+- [R16] `rtk test bun test tests/generator/generate-traffic.test.ts`, `rtk bun run generate:traffic -- --seed 42 --sessions 120` - независимые проверки подтверждают, что команда создаёт требуемые сценарии и печатает summary с D3 primary metric, совпадающий с dashboard.
+- [R17] `rtk test bun run test:e2e -- --grep "second iteration"` - новый config публикуется без migration, old/new sessions используют свои версии, custom event принимается, rollback и старая аналитика сохраняются.
+- [R18] `rtk test bun test`, `rtk test bun run test:e2e` - согласованные unit/integration и browser suites независимо проходят на изолированных SQLite.
+- [R19] `rtk bun run fmt:check`, `rtk bun run typecheck`, `rtk test bun test`, `rtk bun run build`, `rtk test bun run test:e2e` - независимые команды локально воспроизводят обязательные GitHub CI gates; `.github/workflows/ci.yml` не содержит deploy step.
+- [R20] Проверить `README.md` по разделу 9 в `Funnel_Runtime_Fullstack_Dev.md` - все требуемые инструкции и описания присутствуют, D1-D3 и формула primary metric записаны явно, а D2 не выдаётся за выполненный public URL.
+- [R21] `rtk git remote get-url origin` и ручная проверка `DELIVERY.md` - repository URL совпадает с remote, README/CI links открываются, а public URL либо подтверждён работающим smoke check, либо остаётся явно блокирующим `TBD`.

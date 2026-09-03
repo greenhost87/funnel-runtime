@@ -1,0 +1,109 @@
+{
+  "id": "wellness-quiz-alt",
+  "name": "Wellness Plan Quiz (Alternative Copy)",
+  "customEvents": ["benefit_highlight_viewed"],
+  "steps": [
+    {
+      "id": "welcome",
+      "type": "info",
+      "title": "Welcome to your wellness assessment",
+      "description": "Let's build a plan that fits your life.",
+      "transitions": [{ "id": "welcome-next", "target": { "type": "step", "stepId": "goal" } }]
+    },
+    {
+      "id": "goal",
+      "type": "single-select",
+      "title": "Primary wellness goal",
+      "required": true,
+      "options": [
+        { "id": "energy", "label": "More energy" },
+        { "id": "stress", "label": "Less stress" },
+        { "id": "fitness", "label": "Better fitness" }
+      ],
+      "transitions": [
+        {
+          "id": "goal-fitness",
+          "when": { "op": "equals", "value": "fitness" },
+          "target": { "type": "step", "stepId": "training-frequency" }
+        },
+        { "id": "goal-default", "target": { "type": "step", "stepId": "habits" } }
+      ]
+    },
+    {
+      "id": "training-frequency",
+      "type": "single-select",
+      "title": "Current exercise frequency",
+      "required": true,
+      "options": [
+        { "id": "rarely", "label": "Rarely" },
+        { "id": "1-2", "label": "1–2x/week" },
+        { "id": "3plus", "label": "3+x/week" }
+      ],
+      "transitions": [{ "id": "training-next", "target": { "type": "step", "stepId": "habits" } }]
+    },
+    {
+      "id": "habits",
+      "type": "multi-select",
+      "title": "Habits to improve",
+      "minSelections": 1,
+      "options": [
+        { "id": "nutrition", "label": "Nutrition" },
+        { "id": "sleep", "label": "Sleep" },
+        { "id": "movement", "label": "Movement" },
+        { "id": "mindfulness", "label": "Mindfulness" }
+      ],
+      "transitions": [{ "id": "habits-next", "target": { "type": "step", "stepId": "budget" } }]
+    },
+    {
+      "id": "budget",
+      "type": "number",
+      "title": "Monthly wellness budget (USD)",
+      "min": 0,
+      "max": 1000,
+      "required": true,
+      "transitions": [{ "id": "budget-next", "target": { "type": "step", "stepId": "timeline" } }]
+    },
+    {
+      "id": "timeline",
+      "type": "single-select",
+      "title": "Target timeframe",
+      "required": true,
+      "options": [
+        { "id": "2weeks", "label": "2 weeks" },
+        { "id": "1month", "label": "1 month" },
+        { "id": "3months", "label": "3 months" }
+      ],
+      "transitions": [{ "id": "timeline-next", "target": { "type": "step", "stepId": "summary" } }]
+    },
+    {
+      "id": "summary",
+      "type": "info",
+      "title": "Review and finish",
+      "description": "Generate your plan.",
+      "transitions": [{ "id": "summary-result", "target": { "type": "result" } }]
+    }
+  ],
+  "result": {
+    "title": "Your wellness plan",
+    "body": "Alternative copy version with refreshed messaging.",
+    "cta": {
+      "label": "View plan",
+      "url": "https://example.com/wellness/plan-alt"
+    }
+  },
+  "variants": {
+    "A": {},
+    "B": {
+      "stepOrder": ["goal", "timeline", "habits", "budget", "welcome", "summary"],
+      "stepTextOverrides": {
+        "goal": { "title": "Top goal?" },
+        "timeline": { "title": "When?" }
+      },
+      "result": {
+        "title": "Quick wins inside",
+        "body": "Benefit-first result copy for variant B.",
+        "cta": { "label": "Get quick wins", "url": "https://example.com/quick" }
+      }
+    }
+  }
+}

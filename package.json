@@ -1,0 +1,36 @@
+{
+  "name": "funnel-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --bun next dev",
+    "build": "bun --bun next build",
+    "start": "bun --bun next start",
+    "typecheck": "tsc --noEmit",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "migrate": "bun run scripts/migrate.ts",
+    "seed": "bun run scripts/seed.ts",
+    "test": "bun test --timeout 120000 tests/funnel tests/database tests/auth tests/versions tests/sessions tests/events tests/analytics tests/generator tests/app",
+    "test:e2e": "NEXT_DIST_DIR=.next-e2e bun --bun next build && playwright test",
+    "generate:traffic": "bun run scripts/generate-traffic.ts"
+  },
+  "dependencies": {
+    "next": "^15.5.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "sass": "^1.92.1",
+    "valibot": "^1.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/bun": "^1.2.21",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "oxfmt": "^0.63.0",
+    "typescript": "^5.9.2"
+  },
+  "packageManager": "bun@1.4.0"
+}
