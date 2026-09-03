@@ -1,6 +1,7 @@
 import Script from "next/script";
+import { withBasePath } from "@/system/config/base-path";
 
-const BULMA_CALENDAR_SCRIPT = "/vendor/bulma-calendar.min.js";
+const BULMA_CALENDAR_SCRIPT = withBasePath("/vendor/bulma-calendar.min.js");
 
 const BULMA_DATE_BRIDGE_SCRIPT = `(function attachBulmaDateBridge(global) {
   function attachBulmaDate(input, options, initial, onSelect) {

@@ -9,13 +9,13 @@ import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
 const currentDatabase = useIsolatedTestDatabase(import.meta.path);
 
 describe("generateSyntheticTraffic", () => {
-  test("writes sessions for a selected version into the admin dashboard database", () => {
+  test("writes sessions for a selected version into the admin dashboard database", async () => {
     const db = currentDatabase();
     const versions = createVersionService(db);
     const initial = versions.publish(initialConfig);
     versions.publish(alternativeConfig);
 
-    const { generatedSessions } = generateSyntheticTraffic(db, {
+    const { generatedSessions } = await generateSyntheticTraffic(db, {
       versionId: initial.versionId,
       sessionCount: 120,
       seed: 42,
@@ -58,12 +58,12 @@ describe("generateSyntheticTraffic", () => {
     expect(branchTransitions?.count).toBeGreaterThan(0);
   });
 
-  test("anchors generated events to the requested date", () => {
+  test("anchors generated events to the requested date", async () => {
     const db = currentDatabase();
     const versions = createVersionService(db);
     const initial = versions.publish(initialConfig);
 
-    generateSyntheticTraffic(db, {
+    await generateSyntheticTraffic(db, {
       versionId: initial.versionId,
       sessionCount: 120,
       seed: 42,

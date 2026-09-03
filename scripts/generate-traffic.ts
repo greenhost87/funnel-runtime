@@ -61,7 +61,7 @@ try {
   }
   versions.getConfigByVersionId(versionId);
 
-  const generated = generateSyntheticTraffic(database, {
+  const generated = await generateSyntheticTraffic(database, {
     versionId,
     sessionCount,
     seed,

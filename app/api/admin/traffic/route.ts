@@ -20,7 +20,7 @@ export const POST = withAdminApiLog(async function POST(request: Request) {
     return jsonResponse({ error: "Unknown funnel version" }, { status: 400 });
   }
 
-  const { generatedSessions } = generateSyntheticTraffic(getDatabase(), {
+  const { generatedSessions } = await generateSyntheticTraffic(getDatabase(), {
     versionId: body.versionId,
     sessionCount,
     anchorDate: body.date,

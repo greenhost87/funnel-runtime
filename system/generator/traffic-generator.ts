@@ -47,6 +47,7 @@ type SessionWalkResult = {
 };
 const CAMPAIGNS = ["spring", "summer", "launch", "autumn", "winter", "referral"];
 const SEEDED_CAMPAIGNS = ["spring", "summer", "launch"];
+const YIELD_EVERY_SESSIONS = 25;
 function pickCampaign(index: number, random: RandomFn, seeded: boolean): string {
   if (seeded) {
     return SEEDED_CAMPAIGNS[index % SEEDED_CAMPAIGNS.length] ?? "spring";
@@ -70,10 +71,10 @@ function resolveAnchorMs(anchorDate?: string): number {
   }
   return parsed.getTime();
 }
-export function generateSyntheticTraffic(
+export async function generateSyntheticTraffic(
   db: Database,
   options: GenerateSyntheticTrafficOptions,
-): GenerateSyntheticTrafficResult {
+): Promise<GenerateSyntheticTrafficResult> {
   const versions = createVersionService(db);
   versions.getConfigByVersionId(options.versionId);
   const sessions = createSessionService(db);
@@ -91,19 +92,17 @@ export function generateSyntheticTraffic(
       utm: { utmCampaign: campaign, utmSource: "generator", utmMedium: "synthetic" },
     });
     const config = sessions.getEffectiveConfigForSession(session.sessionId);
-    const batch = buildSessionEvents({
-      sessions,
-      session,
-      config,
-      index,
-      random,
-      anchorMs,
-    });
+    const batch = buildSessionEvents({ sessions, session, config, index, random, anchorMs });
     if (!batch) {
       continue;
     }
     deliverEventBatch(events, batch, index);
     generatedSessions += 1;
+    if ((index + 1) % YIELD_EVERY_SESSIONS === 0) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    }
   }
   return { generatedSessions };
 }
@@ -122,9 +121,11 @@ function buildSessionEvents(input: BuildSessionEventsInput): BatchEventInput[] |
     },
   ];
   const dropAfterSteps = Math.floor(input.random() * 6);
+  let walkAttempts = input.config.steps.length * 8 + 32;
   let stepsWalked = 0;
   let hasInjectedBack = false;
-  while (!state.isResult && state.currentStepId) {
+  while (!state.isResult && state.currentStepId && walkAttempts > 0) {
+    walkAttempts -= 1;
     const step = input.config.steps.find((item) => item.id === state.currentStepId);
     if (!step) {
       break;
