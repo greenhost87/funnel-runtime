@@ -197,11 +197,7 @@ export function DateInput({
 }: DateInputProps) {
   const scriptReady = useBulmaBridgeReady();
   const [shouldInjectScripts] = useState(() => markCalendarScriptsRequested());
-  const { displayValue, handleDisplayChange } = useDateDisplayValue(
-    value,
-    defaultValue,
-    onChange,
-  );
+  const { displayValue, handleDisplayChange } = useDateDisplayValue(value, defaultValue, onChange);
   const inputRef = useDateInputCalendar(value, defaultValue, scriptReady, handleDisplayChange);
 
   return (
