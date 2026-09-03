@@ -1,14 +1,14 @@
 import { type NextRequest } from "next/server";
+import { getDatabase } from "@/system/database/connection";
+import { AnswerRequestSchema } from "@/system/funnel/api-response.schema";
 import { getSessionIdFromCookie, handleAnswerMutation } from "@/system/http/funnel-api.helpers";
+import { jsonResponse, parseJsonFromReadable } from "@/system/http/json";
 
 export async function POST(request: NextRequest) {
   const sessionId = await getSessionIdFromCookie();
   if (!sessionId) {
-    return Response.json({ error: "No session" }, { status: 401 });
+    return jsonResponse({ error: "No session" }, { status: 401 });
   }
-  const body = (await request.json()) as { stepId?: string; answer?: unknown };
-  if (!body.stepId) {
-    return Response.json({ error: "stepId is required" }, { status: 400 });
-  }
-  return handleAnswerMutation(sessionId, body.stepId, body.answer);
+  const body = await parseJsonFromReadable(request, AnswerRequestSchema);
+  return handleAnswerMutation(getDatabase(), sessionId, body.stepId, body.answer);
 }

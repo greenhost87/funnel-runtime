@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { getRequiredEnv } from "@/system/config/environment";
+import { getRequiredEnv, isNodeEnvironment } from "@/system/config/environment";
 
-const COOKIE_NAME = "funnel_admin_session";
+export const ADMIN_COOKIE_NAME = "funnel_admin_session";
 const MAX_AGE_SECONDS = 60 * 60 * 8;
 
 function sign(payload: string): string {
@@ -42,10 +42,6 @@ export function verifyAdminSessionToken(token: string | undefined): boolean {
   return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }
 
-export function getAdminCookieName(): string {
-  return COOKIE_NAME;
-}
-
 export function getAdminCookieOptions(): {
   httpOnly: true;
   sameSite: "lax";
@@ -56,10 +52,8 @@ export function getAdminCookieOptions(): {
   return {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isNodeEnvironment("production"),
     path: "/",
     maxAge: MAX_AGE_SECONDS,
   };
 }
-
-export { COOKIE_NAME as ADMIN_COOKIE_NAME };

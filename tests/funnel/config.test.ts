@@ -1,8 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import initialConfig from "@/fixtures/funnels/initial.json";
 import alternativeConfig from "@/fixtures/funnels/alternative.json";
-import { parseFunnelConfig, safeParseFunnelConfig } from "@/system/funnel/config.schema";
+import { parseFunnelConfig } from "@/system/funnel/config.schema";
 import { resolveEffectiveConfig } from "@/system/funnel/variant-resolver";
+import type { JsonValue } from "@/system/http/json-value.types";
+
+function expectInvalidConfig(input: JsonValue): void {
+  expect(() => parseFunnelConfig(input)).toThrow();
+}
 
 describe("funnel config contract", () => {
   test("initial and alternative fixtures parse", () => {
@@ -35,7 +40,7 @@ describe("funnel config contract", () => {
           : step,
       ),
     };
-    expect(safeParseFunnelConfig(broken).success).toBe(false);
+    expectInvalidConfig(broken);
   });
 
   test("rejects variant with broken excluded step reference", () => {
@@ -46,6 +51,32 @@ describe("funnel config contract", () => {
         B: { excludedStepIds: ["does-not-exist"] },
       },
     };
-    expect(safeParseFunnelConfig(broken).success).toBe(false);
+    expectInvalidConfig(broken);
+  });
+
+  test("rejects unknown step types", () => {
+    const broken = {
+      ...initialConfig,
+      steps: [
+        {
+          id: "broken",
+          type: "free-text",
+          title: "Unsupported",
+          transitions: [{ id: "broken-next", target: { type: "result" } }],
+        },
+      ],
+    };
+    expectInvalidConfig(broken);
+  });
+
+  test("rejects variant with broken effective transitions", () => {
+    const broken = {
+      ...initialConfig,
+      variants: {
+        ...initialConfig.variants,
+        B: { excludedStepIds: ["habits"] },
+      },
+    };
+    expect(() => parseFunnelConfig(broken)).toThrow(/Variant B effective config invalid/);
   });
 });

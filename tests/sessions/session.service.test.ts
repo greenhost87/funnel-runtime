@@ -1,20 +1,17 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import initialConfig from "@/fixtures/funnels/initial.json";
 import alternativeConfig from "@/fixtures/funnels/alternative.json";
-import { getDatabase } from "@/system/database/connection";
-import { SessionService } from "@/system/sessions/session.service";
-import { VersionService } from "@/system/versions/version.service";
-import { createTestDatabase, destroyTestDatabase } from "@/tests/setup/test-database";
+import { createSessionService } from "@/system/sessions/session.service";
+import { createVersionService } from "@/system/versions/version.service";
+import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
+
+const currentDatabase = useIsolatedTestDatabase(import.meta.path);
 
 describe("session service", () => {
-  beforeEach(() => {
-    destroyTestDatabase();
-    createTestDatabase();
-    new VersionService(getDatabase()).publish(initialConfig);
-  });
-
   test("pins version and variant across restore", () => {
-    const sessions = new SessionService(getDatabase());
+    const db = currentDatabase();
+    createVersionService(db).publish(initialConfig);
+    const sessions = createSessionService(db);
     const created = sessions.createNew({ variantOverride: "A", utm: { utmCampaign: "spring" } });
     const restored = sessions.createOrRestore(created.sessionId, {});
     expect(restored.versionId).toBe(created.versionId);
@@ -23,9 +20,11 @@ describe("session service", () => {
   });
 
   test("new session gets active version after publish", () => {
-    const sessions = new SessionService(getDatabase());
+    const db = currentDatabase();
+    createVersionService(db).publish(initialConfig);
+    const sessions = createSessionService(db);
     const old = sessions.createNew({ variantOverride: "B" });
-    new VersionService(getDatabase()).publish(alternativeConfig);
+    createVersionService(db).publish(alternativeConfig);
     const restored = sessions.createOrRestore(old.sessionId, {});
     expect(restored.versionId).toBe(old.versionId);
     const fresh = sessions.createNew({});
@@ -33,11 +32,29 @@ describe("session service", () => {
   });
 
   test("variant override applies only on new session", () => {
-    const sessions = new SessionService(getDatabase());
+    const db = currentDatabase();
+    createVersionService(db).publish(initialConfig);
+    const sessions = createSessionService(db);
     const created = sessions.createNew({ variantOverride: "A" });
     const overriddenRestore = sessions.createOrRestore(created.sessionId, { variantOverride: "B" });
     expect(overriddenRestore.variant).toBe("A");
     const fresh = sessions.createOrRestore(null, { variantOverride: "B" });
     expect(fresh.variant).toBe("B");
+  });
+
+  test("records immutable forward transition on answer flow", () => {
+    const db = currentDatabase();
+    createVersionService(db).publish(initialConfig);
+    const sessions = createSessionService(db);
+    const snapshot = sessions.createNew({ variantOverride: "A" });
+    const transitionId = sessions.recordForwardTransition({
+      sessionId: snapshot.sessionId,
+      fromStepId: "welcome",
+      toStepId: "goal",
+      toResult: false,
+    });
+    const transition = sessions.getTransitionDao().getTransition(transitionId);
+    expect(transition?.from_step_id).toBe("welcome");
+    expect(transition?.to_step_id).toBe("goal");
   });
 });

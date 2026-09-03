@@ -1,5 +1,7 @@
 import * as v from "valibot";
-import type { FunnelConfig, FunnelStep, FunnelVariant } from "./config.types";
+import { FUNNEL_VARIANTS, STEP_TYPES, type FunnelConfig, type FunnelStep, type FunnelVariant } from "./config.types";
+import type { JsonValue } from "@/system/http/json-value.types";
+import { resolveEffectiveConfig } from "./variant-resolver";
 
 const TransitionTargetSchema = v.union([
   v.object({ type: v.literal("step"), stepId: v.string() }),
@@ -56,12 +58,30 @@ const InfoStepSchema = v.object({
   type: v.literal("info"),
 });
 
-const FunnelStepSchema = v.union([
+export const FunnelStepSchema = v.union([
   SingleSelectStepSchema,
   MultiSelectStepSchema,
   NumberStepSchema,
   InfoStepSchema,
 ]);
+
+export const ResultConfigSchema = v.object({
+  title: v.string(),
+  body: v.string(),
+  cta: v.object({
+    label: v.string(),
+    url: v.string(),
+  }),
+});
+
+export const StepAnswerSchema = v.union([
+  v.string(),
+  v.array(v.string()),
+  v.number(),
+  v.null(),
+]);
+
+export const FunnelAnswersSchema = v.record(v.string(), StepAnswerSchema);
 
 const VariantOverrideSchema = v.object({
   stepOrder: v.optional(v.array(v.string())),
@@ -93,14 +113,7 @@ export const FunnelConfigSchema = v.object({
   id: v.string(),
   name: v.string(),
   steps: v.pipe(v.array(FunnelStepSchema), v.minLength(6)),
-  result: v.object({
-    title: v.string(),
-    body: v.string(),
-    cta: v.object({
-      label: v.string(),
-      url: v.string(),
-    }),
-  }),
+  result: ResultConfigSchema,
   variants: v.object({
     A: VariantOverrideSchema,
     B: VariantOverrideSchema,
@@ -112,9 +125,8 @@ function collectIds(steps: FunnelStep[]): Set<string> {
   return new Set(steps.map((step) => step.id));
 }
 
-function validateTransitionReferences(config: FunnelConfig): string[] {
+function validateStepTransitions(config: FunnelConfig, stepIds: Set<string>): string[] {
   const errors: string[] = [];
-  const stepIds = collectIds(config.steps);
   const transitionIds = new Set<string>();
 
   for (const step of config.steps) {
@@ -130,37 +142,73 @@ function validateTransitionReferences(config: FunnelConfig): string[] {
     }
   }
 
-  for (const variant of ["A", "B"] as FunnelVariant[]) {
+  return errors;
+}
+
+function validateVariantStepReferences(
+  variant: FunnelVariant,
+  stepIds: Set<string>,
+  stepId: string,
+  label: string,
+): string | null {
+  if (!stepIds.has(stepId)) {
+    return `Variant ${variant} ${label} references unknown step ${stepId}`;
+  }
+  return null;
+}
+
+function validateVariantStepList(
+  variant: FunnelVariant,
+  stepIds: Set<string>,
+  stepIdsToCheck: string[],
+  label: string,
+): string[] {
+  const errors: string[] = [];
+  for (const stepId of stepIdsToCheck) {
+    const error = validateVariantStepReferences(variant, stepIds, stepId, label);
+    if (error) {
+      errors.push(error);
+    }
+  }
+  return errors;
+}
+
+function validateVariantOverrides(config: FunnelConfig, stepIds: Set<string>): string[] {
+  const errors: string[] = [];
+
+  for (const variant of FUNNEL_VARIANTS) {
     const override = config.variants[variant];
     if (override.stepOrder) {
-      for (const stepId of override.stepOrder) {
-        if (!stepIds.has(stepId)) {
-          errors.push(`Variant ${variant} stepOrder references unknown step ${stepId}`);
-        }
-      }
+      errors.push(...validateVariantStepList(variant, stepIds, override.stepOrder, "stepOrder"));
     }
     if (override.excludedStepIds) {
-      for (const stepId of override.excludedStepIds) {
-        if (!stepIds.has(stepId)) {
-          errors.push(`Variant ${variant} excludedStepIds references unknown step ${stepId}`);
-        }
-      }
+      errors.push(
+        ...validateVariantStepList(variant, stepIds, override.excludedStepIds, "excludedStepIds"),
+      );
     }
-    for (const stepId of Object.keys(override.stepTextOverrides ?? {})) {
-      if (!stepIds.has(stepId)) {
-        errors.push(`Variant ${variant} text override references unknown step ${stepId}`);
-      }
-    }
+    errors.push(
+      ...validateVariantStepList(
+        variant,
+        stepIds,
+        Object.keys(override.stepTextOverrides ?? {}),
+        "text override",
+      ),
+    );
   }
 
   return errors;
+}
+
+function validateTransitionReferences(config: FunnelConfig): string[] {
+  const stepIds = collectIds(config.steps);
+  return [...validateStepTransitions(config, stepIds), ...validateVariantOverrides(config, stepIds)];
 }
 
 function hasBranching(config: FunnelConfig): boolean {
   return config.steps.some((step) => step.transitions.filter((t) => t.when).length > 0);
 }
 
-export function parseFunnelConfig(input: unknown): FunnelConfig {
+export function parseFunnelConfig(input: JsonValue): FunnelConfig {
   const parsed = v.parse(FunnelConfigSchema, input);
   const refErrors = validateTransitionReferences(parsed);
   if (refErrors.length > 0) {
@@ -173,33 +221,18 @@ export function parseFunnelConfig(input: unknown): FunnelConfig {
   if (stepIds.size !== parsed.steps.length) {
     throw new Error("Step ids must be unique");
   }
-  return parsed;
-}
-
-export function safeParseFunnelConfig(input: unknown):
-  | {
-      success: true;
-      data: FunnelConfig;
+  for (const step of parsed.steps) {
+    if (!STEP_TYPES.includes(step.type)) {
+      throw new Error(`Unknown step type: ${step.type}`);
     }
-  | {
-      success: false;
-      errors: string[];
-    } {
-  const schemaResult = v.safeParse(FunnelConfigSchema, input);
-  if (!schemaResult.success) {
-    return {
-      success: false,
-      errors: schemaResult.issues.map((issue) => issue.message),
-    };
   }
-
-  try {
-    const data = parseFunnelConfig(schemaResult.output);
-    return { success: true, data };
-  } catch (error) {
-    return {
-      success: false,
-      errors: [error instanceof Error ? error.message : String(error)],
-    };
+  for (const variant of FUNNEL_VARIANTS) {
+    try {
+      resolveEffectiveConfig(parsed, variant);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Variant ${variant} effective config invalid: ${message}`, { cause: error });
+    }
   }
+  return parsed;
 }

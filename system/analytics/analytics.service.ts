@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
-import { AnalyticsDao, type AnalyticsFilters } from "@/system/database/analytics/analytics.dao";
+import * as v from "valibot";
+import { createAnalyticsDao, type AnalyticsFilters } from "@/system/database/analytics/analytics.dao";
 
 export type EdgeMetric = {
   versionId: string;
@@ -35,17 +36,29 @@ export type AnalyticsDashboard = {
   campaigns: string[];
 };
 
-export class AnalyticsService {
-  private readonly dao: AnalyticsDao;
+const CampaignRowSchema = v.object({
+  campaign: v.string(),
+});
 
-  constructor(db: Database) {
-    this.dao = new AnalyticsDao(db);
+export function createAnalyticsService(db: Database) {
+  const dao = createAnalyticsDao(db);
+
+  function listCampaigns(): string[] {
+    const rows = db
+      .query(
+        `SELECT DISTINCT utm_campaign AS campaign FROM events WHERE utm_campaign IS NOT NULL ORDER BY campaign`,
+      )
+      .all();
+    return rows.flatMap((row) => {
+      const parsed = v.safeParse(CampaignRowSchema, row);
+      return parsed.success ? [parsed.output.campaign] : [];
+    });
   }
 
-  getDashboard(filters: AnalyticsFilters = {}): AnalyticsDashboard {
-    const started = this.dao.countDistinctSessionsStarted(filters);
-    const ctaClicked = this.dao.countDistinctSessionsWithCta(filters);
-    const resultViewed = this.dao.countDistinctSessionsReachedResult(filters);
+  function getDashboard(filters: AnalyticsFilters = {}): AnalyticsDashboard {
+    const started = dao.countDistinctSessionsStarted(filters);
+    const ctaClicked = dao.countDistinctSessionsWithCta(filters);
+    const resultViewed = dao.countDistinctSessionsReachedResult(filters);
 
     const summary: AnalyticsSummary = {
       sessionsStarted: started,
@@ -55,9 +68,9 @@ export class AnalyticsService {
       filters,
     };
 
-    const views = this.dao.listStepViews(filters);
-    const completions = this.dao.listCompletionEdges(filters);
-    const completionByFrom = this.dao.listCompletionsByFromStep(filters);
+    const views = dao.listStepViews(filters);
+    const completions = dao.listCompletionEdges(filters);
+    const completionByFrom = dao.listCompletionsByFromStep(filters);
 
     const viewMap = new Map<string, number>();
     for (const view of views) {
@@ -85,7 +98,7 @@ export class AnalyticsService {
       };
     });
 
-    const comparisons = this.dao.listVersionVariantBreakdown(filters).map((row) => ({
+    const comparisons = dao.listVersionVariantBreakdown(filters).map((row) => ({
       versionId: row.versionId,
       variant: row.variant,
       started: row.started,
@@ -98,19 +111,11 @@ export class AnalyticsService {
       summary,
       edges,
       comparisons,
-      campaigns: this.listCampaigns(),
+      campaigns: listCampaigns(),
     };
   }
 
-  private listCampaigns(): string[] {
-    const db = (this.dao as unknown as { db: Database }).db;
-    const rows = db
-      .query(
-        `SELECT DISTINCT utm_campaign AS campaign FROM events WHERE utm_campaign IS NOT NULL ORDER BY campaign`,
-      )
-      .all() as Array<{ campaign: string }>;
-    return rows.map((row) => row.campaign);
-  }
+  return { getDashboard };
 }
 
 function safeRate(numerator: number, denominator: number): number | null {

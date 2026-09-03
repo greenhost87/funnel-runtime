@@ -1,5 +1,8 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+import { FormField } from "@/components/layout/form-field";
+import { FunnelDescription } from "@/components/layout/class-tagged";
 import type { NumberStep } from "@/system/funnel/config.types";
 
 type Props = {
@@ -10,17 +13,19 @@ type Props = {
 
 export function NumberScreen({ step, value, onChange }: Props) {
   return (
-    <div className="form-field">
-      <input
-        className="form-input"
+    <FormField>
+      <Input
+        variant="form"
         type="number"
         min={step.min}
         max={step.max}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
         aria-label={step.title}
       />
-      {step.unit ? <span className="funnel__description">{step.unit}</span> : null}
-    </div>
+      {step.unit ? <FunnelDescription as="span">{step.unit}</FunnelDescription> : null}
+    </FormField>
   );
 }

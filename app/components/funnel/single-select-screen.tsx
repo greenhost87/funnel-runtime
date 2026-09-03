@@ -1,5 +1,8 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FunnelOptions } from "@/components/layout/funnel/funnel-options";
 import type { SingleSelectStep } from "@/system/funnel/config.types";
 
 type Props = {
@@ -10,22 +13,21 @@ type Props = {
 
 export function SingleSelectScreen({ step, value, onChange }: Props) {
   return (
-    <div className="funnel__options" role="radiogroup" aria-label={step.title}>
+    <FunnelOptions role="radiogroup" aria-label={step.title}>
       {step.options.map((option) => (
-        <label
-          key={option.id}
-          className={`funnel__option${value === option.id ? " funnel__option--selected" : ""}`}
-        >
-          <input
+        <Label key={option.id} variant="option" selected={value === option.id}>
+          <Input
             type="radio"
             name={step.id}
             value={option.id}
             checked={value === option.id}
-            onChange={() => onChange(option.id)}
+            onChange={() => {
+              onChange(option.id);
+            }}
           />
           <span>{option.label}</span>
-        </label>
+        </Label>
       ))}
-    </div>
+    </FunnelOptions>
   );
 }

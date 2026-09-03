@@ -1,5 +1,9 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { FunnelResult } from "@/components/layout/funnel/funnel-result";
+import { FunnelResultBody } from "@/components/layout/funnel/funnel-result-body";
+import { FunnelResultTitle } from "@/components/layout/funnel/funnel-result-title";
 import type { ResultConfig } from "@/system/funnel/config.types";
 
 type Props = {
@@ -9,12 +13,12 @@ type Props = {
 
 export function ResultScreen({ result, onCtaClick }: Props) {
   return (
-    <div className="funnel__result">
-      <h2 className="funnel__result-title">{result.title}</h2>
-      <p className="funnel__result-body">{result.body}</p>
-      <button className="btn btn--primary btn--cta" type="button" onClick={onCtaClick}>
+    <FunnelResult>
+      <FunnelResultTitle>{result.title}</FunnelResultTitle>
+      <FunnelResultBody>{result.body}</FunnelResultBody>
+      <Button variant="primary" cta type="button" onClick={onCtaClick}>
         {result.cta.label}
-      </button>
-    </div>
+      </Button>
+    </FunnelResult>
   );
 }

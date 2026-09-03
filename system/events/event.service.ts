@@ -1,118 +1,153 @@
 import type { Database } from "bun:sqlite";
 import { validateBatchItem } from "@/system/events/event.schema";
 import type { BatchEventInput, BatchEventResult } from "@/system/events/event.types";
-import { sanitizeEventProperties } from "@/system/events/event.types";
-import { EventDao } from "@/system/database/events/event.dao";
-import { SessionDao } from "@/system/database/sessions/session.dao";
-import { SessionTransitionDao } from "@/system/database/sessions/session.dao";
-import { VersionService } from "@/system/versions/version.service";
+import { sanitizeEventProperties } from "@/system/events/event-properties.schema";
+import { createEventDao } from "@/system/database/events/event.dao";
+import {
+  createSessionDao,
+  createSessionTransitionDao,
+  type SessionRow,
+} from "@/system/database/sessions/session.dao";
+import { createVersionService } from "@/system/versions/version.service";
 
-export class EventService {
-  private readonly events: EventDao;
-  private readonly sessions: SessionDao;
-  private readonly transitions: SessionTransitionDao;
-  private readonly versions: VersionService;
-  private readonly db: Database;
+const BUILT_IN_EVENTS = [
+  "session_started",
+  "step_viewed",
+  "answer_submitted",
+  "step_completed",
+  "back_clicked",
+  "result_viewed",
+  "cta_clicked",
+];
 
-  constructor(db: Database) {
-    this.db = db;
-    this.events = new EventDao(db);
-    this.sessions = new SessionDao(db);
-    this.transitions = new SessionTransitionDao(db);
-    this.versions = new VersionService(db);
+const BUILT_IN_EVENT_SET = new Set<string>(BUILT_IN_EVENTS);
+
+function reject(eventId: string, reason: string): BatchEventResult {
+  return { eventId, status: "rejected", reason };
+}
+
+export function createEventService(db: Database) {
+  const events = createEventDao(db);
+  const sessions = createSessionDao(db);
+  const transitions = createSessionTransitionDao(db);
+  const versions = createVersionService(db);
+
+  function processBatch(items: BatchEventInput[]): BatchEventResult[] {
+    return items.map((item) => processOne(item));
   }
 
-  processBatch(items: BatchEventInput[]): BatchEventResult[] {
-    return items.map((item) => this.processOne(item));
+  function validateEventName(item: BatchEventInput, customEvents: Set<string>): string | null {
+    if (!BUILT_IN_EVENT_SET.has(item.eventName) && !customEvents.has(item.eventName)) {
+      return "Event not declared in config";
+    }
+    return null;
   }
 
-  private processOne(item: BatchEventInput): BatchEventResult {
+  function validateStepCompleted(
+    item: BatchEventInput,
+  ): { ok: true; transitionId: string } | { ok: false; reason: string } {
+    const transitionIdValue = item.transitionId;
+    if (!transitionIdValue) {
+      return { ok: false, reason: "Missing transitionId" };
+    }
+    const transition = transitions.getTransition(transitionIdValue);
+    if (!transition) {
+      return { ok: false, reason: "Unknown transition" };
+    }
+    if (transition.session_id !== item.sessionId) {
+      return { ok: false, reason: "Transition belongs to another session" };
+    }
+    if (item.stepId && transition.from_step_id !== item.stepId) {
+      return { ok: false, reason: "Transition step mismatch" };
+    }
+    if (transitions.isTransitionLinkedToCompletion(transitionIdValue)) {
+      return { ok: false, reason: "Transition already completed" };
+    }
+    return { ok: true, transitionId: transitionIdValue };
+  }
+
+  function validateSessionStarted(item: BatchEventInput, session: SessionRow): string | null {
+    if (session.session_started_event_id !== item.eventId) {
+      return "session_started event id mismatch";
+    }
+    return null;
+  }
+
+  function persistEvent(
+    item: BatchEventInput,
+    session: SessionRow,
+    transitionId: string | null,
+  ): "inserted" | "duplicate" {
+    const run = db.transaction(() => {
+      const result = events.insertEvent({
+        eventId: item.eventId,
+        sessionId: item.sessionId,
+        eventName: item.eventName,
+        clientTimestamp: item.clientTimestamp,
+        versionId: session.version_id,
+        variant: session.variant,
+        stepId: item.stepId ?? null,
+        utmSource: session.utm_source,
+        utmMedium: session.utm_medium,
+        utmCampaign: session.utm_campaign,
+        utmTerm: session.utm_term,
+        utmContent: session.utm_content,
+        transitionId,
+        properties: sanitizeEventProperties(item.properties),
+      });
+
+      if (item.eventName === "session_started") {
+        sessions.markSessionStartedRecorded(item.sessionId, item.eventId);
+      }
+
+      return result === "duplicate" ? ("duplicate" as const) : ("inserted" as const);
+    });
+    return run();
+  }
+
+  function processOne(item: BatchEventInput): BatchEventResult {
     const validationError = validateBatchItem(item);
     if (validationError) {
-      return { eventId: item.eventId, status: "rejected", reason: validationError };
+      return reject(item.eventId, validationError);
     }
 
-    const session = this.sessions.getById(item.sessionId);
+    const session = sessions.getById(item.sessionId);
     if (!session) {
-      return { eventId: item.eventId, status: "rejected", reason: "Unknown session" };
+      return reject(item.eventId, "Unknown session");
     }
 
-    const config = this.versions.getConfigByVersionId(session.version_id);
-    const allowedCustom = new Set(config.customEvents ?? []);
-    const isBuiltIn = [
-      "session_started",
-      "step_viewed",
-      "answer_submitted",
-      "step_completed",
-      "back_clicked",
-      "result_viewed",
-      "cta_clicked",
-    ].includes(item.eventName);
-    if (!isBuiltIn && !allowedCustom.has(item.eventName)) {
-      return { eventId: item.eventId, status: "rejected", reason: "Event not declared in config" };
+    const config = versions.getConfigByVersionId(session.version_id);
+    const eventNameError = validateEventName(item, new Set(config.customEvents ?? []));
+    if (eventNameError) {
+      return reject(item.eventId, eventNameError);
     }
 
     let transitionId: string | null = null;
     if (item.eventName === "step_completed") {
-      const transition = this.transitions.getTransition(item.transitionId!);
-      if (!transition) {
-        return { eventId: item.eventId, status: "rejected", reason: "Unknown transition" };
+      const stepCompleted = validateStepCompleted(item);
+      if (!stepCompleted.ok) {
+        return reject(item.eventId, stepCompleted.reason);
       }
-      if (transition.session_id !== item.sessionId) {
-        return {
-          eventId: item.eventId,
-          status: "rejected",
-          reason: "Transition belongs to another session",
-        };
-      }
-      if (item.stepId && transition.from_step_id !== item.stepId) {
-        return { eventId: item.eventId, status: "rejected", reason: "Transition step mismatch" };
-      }
-      if (this.transitions.isTransitionLinkedToCompletion(item.transitionId!)) {
-        return {
-          eventId: item.eventId,
-          status: "rejected",
-          reason: "Transition already completed",
-        };
-      }
-      transitionId = item.transitionId!;
-    }
-
-    const insertResult = this.events.insertEvent({
-      eventId: item.eventId,
-      sessionId: item.sessionId,
-      eventName: item.eventName,
-      clientTimestamp: item.clientTimestamp,
-      versionId: session.version_id,
-      variant: session.variant,
-      stepId: item.stepId ?? null,
-      utmSource: session.utm_source,
-      utmMedium: session.utm_medium,
-      utmCampaign: session.utm_campaign,
-      utmTerm: session.utm_term,
-      utmContent: session.utm_content,
-      transitionId,
-      properties: sanitizeEventProperties(item.properties),
-    });
-
-    if (insertResult === "duplicate") {
-      if (item.eventName === "session_started") {
-        this.sessions.markSessionStartedRecorded(item.sessionId, item.eventId);
-      }
-      return { eventId: item.eventId, status: "duplicate" };
+      transitionId = stepCompleted.transitionId;
     }
 
     if (item.eventName === "session_started") {
-      if (session.session_started_event_id !== item.eventId) {
-        return {
-          eventId: item.eventId,
-          status: "rejected",
-          reason: "session_started event id mismatch",
-        };
+      const sessionStartedError = validateSessionStarted(item, session);
+      if (sessionStartedError) {
+        return reject(item.eventId, sessionStartedError);
       }
-      this.sessions.markSessionStartedRecorded(item.sessionId, item.eventId);
     }
 
-    return { eventId: item.eventId, status: "accepted" };
+    try {
+      const insertResult = persistEvent(item, session, transitionId);
+      if (insertResult === "duplicate") {
+        return { eventId: item.eventId, status: "duplicate" };
+      }
+      return { eventId: item.eventId, status: "accepted" };
+    } catch {
+      return reject(item.eventId, "Failed to persist event");
+    }
   }
+
+  return { processBatch };
 }

@@ -1,7 +1,22 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState, type SyntheticEvent } from "react";
+import { SecondaryActionButton } from "@/components/ui/secondary-action-button";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AdminCard, AdminHistoryItem } from "@/components/layout/class-tagged";
+import { AdminHistory } from "@/components/layout/admin/admin-history";
+import { AdminValidationErrors } from "@/components/layout/admin/admin-validation-errors";
+import { AdminCardTitle } from "@/components/layout/admin-card-title";
+import { AnalyticsEmpty } from "@/components/layout/analytics/analytics-empty";
+import { FormField } from "@/components/layout/form-field";
+import {
+  ErrorResponseSchema,
+  VersionsListResponseSchema,
+} from "@/system/funnel/api-response.schema";
 import type { ActiveVersionSnapshot } from "@/system/versions/version.service";
+import { parseJsonFromReadable } from "@/system/http/json";
 
 type HistoryItem = {
   activationId: number;
@@ -11,10 +26,58 @@ type HistoryItem = {
   isActive: boolean;
 };
 
+function renderValidationErrors(errors: readonly string[]) {
+  return (
+    <AdminValidationErrors>
+      <ul>
+        {errors.map((error) => (
+          <li key={error}>{error}</li>
+        ))}
+      </ul>
+    </AdminValidationErrors>
+  );
+}
+
 type Props = {
   initialActive: ActiveVersionSnapshot | null;
   initialHistory: HistoryItem[];
 };
+
+async function loadVersionsState() {
+  const response = await fetch("/api/admin/versions");
+  return parseJsonFromReadable(response, VersionsListResponseSchema);
+}
+
+async function readAdminErrors(response: Response): Promise<string[]> {
+  const payload = await parseJsonFromReadable(response, ErrorResponseSchema);
+  return payload.details && payload.details.length > 0 ? payload.details : [payload.error];
+}
+
+async function refreshVersionsState(
+  setActive: (value: ActiveVersionSnapshot | null) => void,
+  setHistory: (value: HistoryItem[]) => void,
+) {
+  const payload = await loadVersionsState();
+  setActive(payload.active);
+  setHistory(payload.history);
+}
+
+async function runVersionsMutation(
+  setLoading: (value: boolean) => void,
+  setErrors: (value: string[]) => void,
+  fetcher: () => Promise<Response>,
+  onSuccess: () => Promise<void>,
+) {
+  setLoading(true);
+  setErrors([]);
+  const response = await fetcher();
+  setLoading(false);
+  if (!response.ok) {
+    setErrors(await readAdminErrors(response));
+    return;
+  }
+  await onSuccess();
+}
 
 export function VersionsClient({ initialActive, initialHistory }: Props) {
   const [active, setActive] = useState(initialActive);
@@ -22,55 +85,40 @@ export function VersionsClient({ initialActive, initialHistory }: Props) {
   const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
-  async function refreshState() {
-    const response = await fetch("/api/admin/versions");
-    const payload = (await response.json()) as {
-      active: ActiveVersionSnapshot | null;
-      history: HistoryItem[];
-    };
-    setActive(payload.active);
-    setHistory(payload.history);
-  }
-
-  async function onPublish(event: FormEvent<HTMLFormElement>) {
+  async function onPublish(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoading(true);
-    setErrors([]);
-    const formData = new FormData(event.currentTarget);
-    const response = await fetch("/api/admin/versions", { method: "POST", body: formData });
-    setLoading(false);
-    if (!response.ok) {
-      const payload = (await response.json()) as { details?: string[]; error?: string };
-      setErrors(payload.details ?? [payload.error ?? "Publication failed"]);
-      return;
-    }
-    await refreshState();
-    event.currentTarget.reset();
+    const form = event.currentTarget;
+    await runVersionsMutation(
+      setLoading,
+      setErrors,
+      async () => fetch("/api/admin/versions", { method: "POST", body: new FormData(form) }),
+      async () => {
+        await refreshVersionsState(setActive, setHistory);
+        form.reset();
+      },
+    );
   }
 
   async function onRollback(versionId: string) {
-    setLoading(true);
-    setErrors([]);
-    const response = await fetch("/api/admin/versions/rollback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ versionId }),
-    });
-    setLoading(false);
-    if (!response.ok) {
-      const payload = (await response.json()) as { error?: string };
-      setErrors([payload.error ?? "Rollback failed"]);
-      return;
-    }
-    await refreshState();
+    await runVersionsMutation(
+      setLoading,
+      setErrors,
+      async () =>
+        fetch("/api/admin/versions/rollback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ versionId }),
+        }),
+      async () => refreshVersionsState(setActive, setHistory),
+    );
   }
 
   return (
     <div>
-      <h1 className="admin-card__title">Funnel versions</h1>
+      <AdminCardTitle>Funnel versions</AdminCardTitle>
 
-      <section className="admin-card">
-        <h2 className="admin-card__title">Active version</h2>
+      <AdminCard>
+        <AdminCardTitle as="h2">Active version</AdminCardTitle>
         {active ? (
           <div>
             <p>
@@ -84,70 +132,60 @@ export function VersionsClient({ initialActive, initialHistory }: Props) {
             </p>
           </div>
         ) : (
-          <p className="analytics-empty">No active version yet.</p>
+          <AnalyticsEmpty>No active version yet.</AnalyticsEmpty>
         )}
-      </section>
+      </AdminCard>
 
-      <section className="admin-card">
-        <h2 className="admin-card__title">Publish JSON config</h2>
-        <form onSubmit={onPublish}>
-          <div className="form-field">
-            <label className="form-label" htmlFor="config">
-              Local JSON file
-            </label>
-            <input
+      <AdminCard>
+        <AdminCardTitle as="h2">Publish JSON config</AdminCardTitle>
+        <form
+          onSubmit={(event) => {
+            void onPublish(event);
+          }}
+        >
+          <FormField>
+            <Label htmlFor="config">Local JSON file</Label>
+            <Input
               id="config"
-              className="form-file"
+              variant="file"
               type="file"
               name="config"
               accept="application/json,.json"
               required
             />
-          </div>
-          <button className="btn btn--primary" type="submit" disabled={loading}>
+          </FormField>
+          <Button variant="primary" type="submit" disabled={loading}>
             Publish
-          </button>
+          </Button>
         </form>
-        {errors.length > 0 ? (
-          <div className="admin-validation-errors">
-            <ul>
-              {errors.map((error) => (
-                <li key={error}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </section>
+        {errors.length > 0 ? renderValidationErrors(errors) : null}
+      </AdminCard>
 
-      <section className="admin-card">
-        <h2 className="admin-card__title">Activation history</h2>
-        <div className="admin-history">
+      <AdminCard>
+        <AdminCardTitle as="h2">Activation history</AdminCardTitle>
+        <AdminHistory>
           {history.map((item) => (
-            <div
-              key={item.activationId}
-              className={`admin-history__item${item.isActive ? " admin-history__item--active" : ""}`}
-            >
+            <AdminHistoryItem key={item.activationId} active={item.isActive}>
               <div>
                 <strong>{item.configId}</strong>
                 <div>{item.versionId}</div>
                 <div>{item.activatedAt}</div>
               </div>
               {!item.isActive ? (
-                <button
-                  className="btn btn--secondary"
-                  type="button"
-                  disabled={loading}
+                <SecondaryActionButton
+                  loading={loading}
+                  loadingLabel="Rolling back…"
                   onClick={() => void onRollback(item.versionId)}
                 >
                   Rollback
-                </button>
+                </SecondaryActionButton>
               ) : (
                 <span>Active</span>
               )}
-            </div>
+            </AdminHistoryItem>
           ))}
-        </div>
-      </section>
+        </AdminHistory>
+      </AdminCard>
     </div>
   );
 }

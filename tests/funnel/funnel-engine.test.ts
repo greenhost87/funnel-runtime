@@ -15,7 +15,10 @@ describe("funnel engine", () => {
 
   test("validates answers by step type", () => {
     const effective = resolveEffectiveConfig(config, "A");
-    const goalStep = effective.steps.find((step) => step.id === "goal")!;
+    const goalStep = effective.steps.find((step) => step.id === "goal");
+    if (!goalStep) {
+      throw new Error("Expected goal step");
+    }
     expect(validateAnswer(goalStep, "energy").valid).toBe(true);
     expect(validateAnswer(goalStep, "invalid").valid).toBe(false);
   });

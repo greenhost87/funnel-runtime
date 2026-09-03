@@ -1,4 +1,20 @@
+import {
+  BatchEventItemSchema,
+  BatchEventResponseSchema,
+} from "@/system/events/event.schema";
 import type { BatchEventInput, BatchEventResult } from "@/system/events/event.types";
+import type { EventProperties } from "@/system/events/event-properties.schema";
+import { parseJsonFromReadable } from "@/system/http/json";
+import * as v from "valibot";
+
+export type EventIntentInput = {
+  eventId: string;
+  eventName: string;
+  sessionId: string;
+  stepId?: string | null;
+  transitionId?: string | null;
+  properties?: EventProperties;
+};
 
 const pendingEvents = new Map<string, BatchEventInput>();
 
@@ -6,14 +22,14 @@ function storageKey(eventId: string): string {
   return `funnel-event:${eventId}`;
 }
 
-export function rememberEventIntent(event: BatchEventInput): void {
+function rememberEventIntent(event: BatchEventInput): void {
   pendingEvents.set(event.eventId, event);
   if (typeof window !== "undefined") {
     sessionStorage.setItem(storageKey(event.eventId), JSON.stringify(event));
   }
 }
 
-export function loadStoredEventIntent(eventId: string): BatchEventInput | null {
+function loadStoredEventIntent(eventId: string): BatchEventInput | null {
   const cached = pendingEvents.get(eventId);
   if (cached) {
     return cached;
@@ -25,10 +41,11 @@ export function loadStoredEventIntent(eventId: string): BatchEventInput | null {
   if (!raw) {
     return null;
   }
-  return JSON.parse(raw) as BatchEventInput;
+  const result = v.safeParse(v.pipe(v.string(), v.parseJson(), BatchEventItemSchema), raw);
+  return result.success ? result.output : null;
 }
 
-export function clearEventIntent(eventId: string): void {
+function clearEventIntent(eventId: string): void {
   pendingEvents.delete(eventId);
   if (typeof window !== "undefined") {
     sessionStorage.removeItem(storageKey(eventId));
@@ -47,7 +64,7 @@ export async function sendEventBatch(events: BatchEventInput[]): Promise<BatchEv
   if (!response.ok) {
     throw new Error("Event batch failed");
   }
-  const payload = (await response.json()) as { results: BatchEventResult[] };
+  const payload = await parseJsonFromReadable(response, BatchEventResponseSchema);
   for (const result of payload.results) {
     if (result.status === "accepted" || result.status === "duplicate") {
       clearEventIntent(result.eventId);
@@ -68,9 +85,7 @@ export async function sendEventWithRetry(event: BatchEventInput): Promise<BatchE
   }
 }
 
-export function createEventIntent(
-  input: Omit<BatchEventInput, "clientTimestamp">,
-): BatchEventInput {
+export function createEventIntent(input: EventIntentInput): BatchEventInput {
   return {
     ...input,
     clientTimestamp: new Date().toISOString(),

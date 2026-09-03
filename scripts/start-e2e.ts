@@ -1,52 +1,49 @@
+import { spawn as bunSpawn } from "bun";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
+import { createEnv, getBooleanEnv, getPositiveIntegerEnv } from "@/system/config/environment";
 
 const tempDir = mkdtempSync(join(tmpdir(), "funnel-e2e-"));
 const dbPath = join(tempDir, "e2e.sqlite");
 
-process.env = {
-  ...process.env,
+const port = getPositiveIntegerEnv("PORT") ?? 3000;
+const productionMode = getBooleanEnv("NODE_ENV_PRODUCTION", true);
+
+const env = createEnv({
   SQLITE_PATH: dbPath,
   ADMIN_PASSWORD: "e2e-admin",
   ADMIN_SIGNING_SECRET: "e2e-signing-secret-with-length",
-  APP_URL: "http://127.0.0.1:3000",
-  NODE_ENV: "production",
-  NEXT_DIST_DIR: ".next-e2e",
-  PORT: "3000",
+  APP_URL: `http://127.0.0.1:${port}`,
+  NODE_ENV: productionMode ? "production" : "development",
+  PORT: String(port),
   HOSTNAME: "127.0.0.1",
-};
+});
 
-await Bun.spawn(["bun", "run", "scripts/migrate.ts"], {
+await bunSpawn(["bun", "run", "scripts/migrate.ts"], {
   cwd: process.cwd(),
-  env: process.env,
+  env,
   stdout: "inherit",
   stderr: "inherit",
 }).exited;
 
-await Bun.spawn(["bun", "run", "scripts/seed.ts"], {
+await bunSpawn(["bun", "run", "scripts/seed.ts"], {
   cwd: process.cwd(),
-  env: process.env,
+  env,
   stdout: "inherit",
   stderr: "inherit",
 }).exited;
 
-let child: ChildProcess | null = spawn(
-  "bun",
-  ["--bun", "next", "start", "-p", "3000", "-H", "127.0.0.1"],
-  {
-    cwd: process.cwd(),
-    env: process.env,
-    stdio: "inherit",
-  },
-);
+const server = bunSpawn(["bun", "--bun", "next", "start", "-p", String(port), "-H", "127.0.0.1"], {
+  cwd: process.cwd(),
+  env,
+  stdout: "inherit",
+  stderr: "inherit",
+  stdin: "inherit",
+});
 
 function cleanup() {
-  if (child) {
-    child.kill("SIGTERM");
-    child = null;
-  }
+  server.kill();
   rmSync(tempDir, { recursive: true, force: true });
 }
 
@@ -59,9 +56,9 @@ process.on("SIGTERM", () => {
   process.exit(0);
 });
 
-child.on("exit", (code) => {
+void server.exited.then((code) => {
   cleanup();
-  process.exit(code ?? 1);
+  process.exit(code);
 });
 
 // Keep the launcher alive while the Next.js server runs.

@@ -1,5 +1,7 @@
 "use client";
 
+import { FunnelDescription } from "@/components/layout/class-tagged";
+import { FunnelHeader } from "@/components/layout/funnel/funnel-header";
 import type { InfoStep } from "@/system/funnel/config.types";
 
 type Props = {
@@ -8,8 +10,8 @@ type Props = {
 
 export function InfoScreen({ step }: Props) {
   return (
-    <div className="funnel__header">
-      {step.description ? <p className="funnel__description">{step.description}</p> : null}
-    </div>
+    <FunnelHeader>
+      {step.description ? <FunnelDescription>{step.description}</FunnelDescription> : null}
+    </FunnelHeader>
   );
 }

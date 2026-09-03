@@ -1,57 +1,116 @@
-import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import { getSqlitePath } from "@/system/config/environment";
+import { Database } from 'bun:sqlite';
+import { mkdirSync } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
+import * as v from 'valibot';
+import { getOptionalEnv } from '@/system/config/environment';
 
-const SHARED_DB_KEY = Symbol.for("funnel-runtime.database");
+const SHARED_SQLITE_STATE_KEY = Symbol.for('system.database.sqlite.connection-state.v1');
 
-type SharedDbState = {
-  db: Database | null;
-  path: string | null;
+const SharedSqliteStateSchema = v.object({
+  active: v.nullable(v.unknown()),
+  filename: v.nullable(v.string()),
+  generation: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  testOwned: v.boolean(),
+});
+
+type SharedSqliteState = {
+  active: Database | null;
+  filename: string | null;
+  generation: number;
+  testOwned: boolean;
 };
 
-function getSharedState(): SharedDbState {
-  const existing = Reflect.get(globalThis, SHARED_DB_KEY) as SharedDbState | undefined;
-  if (existing) {
+function createSharedSqliteState(): SharedSqliteState {
+  return { active: null, filename: null, generation: 0, testOwned: false };
+}
+
+function isSharedSqliteState(value: unknown): value is SharedSqliteState {
+  const parsed = v.safeParse(SharedSqliteStateSchema, value);
+  if (!parsed.success) {
+    return false;
+  }
+  return parsed.output.active === null || parsed.output.active instanceof Database;
+}
+
+function sharedSqliteState(): SharedSqliteState {
+  const existing: unknown = Reflect.get(globalThis, SHARED_SQLITE_STATE_KEY);
+  if (existing !== undefined) {
+    if (!isSharedSqliteState(existing)) {
+      throw new Error('Invalid shared SQLite connection state');
+    }
     return existing;
   }
-  const created: SharedDbState = { db: null, path: null };
-  Reflect.set(globalThis, SHARED_DB_KEY, created);
+  const created = createSharedSqliteState();
+  Reflect.set(globalThis, SHARED_SQLITE_STATE_KEY, created);
   return created;
 }
 
-function openDatabase(path: string): Database {
-  mkdirSync(dirname(path), { recursive: true });
-  const db = new Database(path, { create: true });
-  db.exec("PRAGMA journal_mode = WAL;");
-  db.exec("PRAGMA foreign_keys = ON;");
-  return db;
+function configuredFilename(): string {
+  const configured = getOptionalEnv('SQLITE_PATH') ?? 'data/app.sqlite';
+  if (configured === ':memory:' || isAbsolute(configured)) {
+    return configured;
+  }
+  return resolve(process.cwd(), configured);
 }
 
-export function getDatabase(customPath?: string): Database {
-  const path = customPath ?? getSqlitePath();
-  const state = getSharedState();
-  if (state.db && state.path === path) {
-    return state.db;
+function openDatabase(filename: string): Database {
+  if (filename !== ':memory:') {
+    mkdirSync(dirname(filename), { recursive: true });
   }
-  if (state.db) {
-    state.db.close();
+  const database = new Database(filename, { create: true, strict: true });
+  database.run('PRAGMA foreign_keys = ON');
+  database.run('PRAGMA busy_timeout = 5000');
+  if (filename !== ':memory:') {
+    database.run('PRAGMA journal_mode = WAL');
   }
-  const db = openDatabase(path);
-  state.db = db;
-  state.path = path;
-  return db;
+  return database;
+}
+
+export function getDatabase(): Database {
+  const state = sharedSqliteState();
+  if (state.testOwned && state.active !== null) {
+    return state.active;
+  }
+
+  const filename = configuredFilename();
+  if (state.active !== null && state.filename === filename) {
+    return state.active;
+  }
+
+  closeDatabase();
+  state.active = openDatabase(filename);
+  state.filename = filename;
+  state.generation += 1;
+  return state.active;
+}
+
+export function getDatabaseGeneration(): number {
+  return sharedSqliteState().generation;
 }
 
 export function closeDatabase(): void {
-  const state = getSharedState();
-  if (state.db) {
-    state.db.close();
-    state.db = null;
-    state.path = null;
+  const state = sharedSqliteState();
+  if (state.active !== null) {
+    state.active.close(false);
+    state.active = null;
+    state.filename = null;
+    state.testOwned = false;
+    state.generation += 1;
   }
 }
 
-export function resetDatabaseConnection(): void {
+export function installDatabaseForTests(database: Database): void {
   closeDatabase();
+  const state = sharedSqliteState();
+  state.active = database;
+  state.filename = null;
+  state.testOwned = true;
+  state.generation += 1;
+}
+
+export function releaseDatabaseForTests(): void {
+  const state = sharedSqliteState();
+  if (state.testOwned) {
+    closeDatabase();
+  }
 }

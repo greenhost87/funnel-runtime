@@ -1,6 +1,7 @@
-export type FunnelVariant = "A" | "B";
+export const FUNNEL_VARIANTS = ["A", "B"] as const;
+export type FunnelVariant = (typeof FUNNEL_VARIANTS)[number];
 
-export type StepType = "single-select" | "multi-select" | "number" | "info";
+export const STEP_TYPES = ["single-select", "multi-select", "number", "info"] as const;
 
 export type TransitionTarget = { type: "step"; stepId: string } | { type: "result" };
 
@@ -16,20 +17,21 @@ export type StepTransition = {
   target: TransitionTarget;
 };
 
-type StepBase = {
+export type SingleSelectStep = {
   id: string;
   title: string;
   description?: string;
   transitions: StepTransition[];
-};
-
-export type SingleSelectStep = StepBase & {
   type: "single-select";
   options: Array<{ id: string; label: string }>;
   required?: boolean;
 };
 
-export type MultiSelectStep = StepBase & {
+export type MultiSelectStep = {
+  id: string;
+  title: string;
+  description?: string;
+  transitions: StepTransition[];
   type: "multi-select";
   options: Array<{ id: string; label: string }>;
   minSelections?: number;
@@ -37,7 +39,11 @@ export type MultiSelectStep = StepBase & {
   required?: boolean;
 };
 
-export type NumberStep = StepBase & {
+export type NumberStep = {
+  id: string;
+  title: string;
+  description?: string;
+  transitions: StepTransition[];
   type: "number";
   min?: number;
   max?: number;
@@ -45,7 +51,11 @@ export type NumberStep = StepBase & {
   unit?: string;
 };
 
-export type InfoStep = StepBase & {
+export type InfoStep = {
+  id: string;
+  title: string;
+  description?: string;
+  transitions: StepTransition[];
   type: "info";
 };
 
@@ -60,13 +70,20 @@ export type ResultConfig = {
   };
 };
 
+export type ResultOverride = {
+  title?: string;
+  body?: string;
+  cta?: {
+    label?: string;
+    url?: string;
+  };
+};
+
 export type VariantOverride = {
   stepOrder?: string[];
   excludedStepIds?: string[];
   stepTextOverrides?: Record<string, { title?: string; description?: string }>;
-  result?: Partial<Omit<ResultConfig, "cta">> & {
-    cta?: Partial<ResultConfig["cta"]>;
-  };
+  result?: ResultOverride;
 };
 
 export type FunnelConfig = {

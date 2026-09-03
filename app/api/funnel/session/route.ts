@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
+import { getDatabase } from "@/system/database/connection";
 import {
   buildApiState,
   getServices,
@@ -7,31 +8,36 @@ import {
   parseVariantOverride,
   setSessionCookie,
 } from "@/system/http/funnel-api.helpers";
+import { jsonResponse } from "@/system/http/json";
 
-export async function GET(request: NextRequest) {
-  const { sessions } = getServices();
-  const existingId = await getSessionIdFromCookie();
-  const searchParams = request.nextUrl.searchParams;
+function createSessionResponse(
+  db: ReturnType<typeof getDatabase>,
+  existingId: string | undefined,
+  searchParams: URLSearchParams,
+  options: { alwaysSetCookie: boolean },
+) {
+  const { sessions } = getServices(db);
   const snapshot = sessions.createOrRestore(existingId ?? null, {
     variantOverride: existingId ? undefined : parseVariantOverride(searchParams),
     utm: existingId ? undefined : parseUtmFromSearchParams(searchParams),
   });
-  const response = NextResponse.json(buildApiState(snapshot));
-  if (!existingId || existingId !== snapshot.sessionId) {
+  const response = jsonResponse(buildApiState(db, snapshot));
+  if (options.alwaysSetCookie || !existingId || existingId !== snapshot.sessionId) {
     setSessionCookie(response, snapshot.sessionId);
   }
   return response;
 }
 
-export async function POST(request: NextRequest) {
-  const { sessions } = getServices();
+export async function GET(request: NextRequest) {
   const existingId = await getSessionIdFromCookie();
-  const searchParams = request.nextUrl.searchParams;
-  const snapshot = sessions.createOrRestore(existingId ?? null, {
-    variantOverride: existingId ? undefined : parseVariantOverride(searchParams),
-    utm: existingId ? undefined : parseUtmFromSearchParams(searchParams),
+  return createSessionResponse(getDatabase(), existingId, request.nextUrl.searchParams, {
+    alwaysSetCookie: false,
   });
-  const response = NextResponse.json(buildApiState(snapshot));
-  setSessionCookie(response, snapshot.sessionId);
-  return response;
+}
+
+export async function POST(request: NextRequest) {
+  const existingId = await getSessionIdFromCookie();
+  return createSessionResponse(getDatabase(), existingId, request.nextUrl.searchParams, {
+    alwaysSetCookie: true,
+  });
 }

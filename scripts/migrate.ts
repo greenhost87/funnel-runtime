@@ -1,4 +1,4 @@
-import { runMigrations } from "@/system/database/migrate";
+import { runDatabaseMigrations } from "@/system/database/migrate";
 
-runMigrations();
+runDatabaseMigrations();
 console.log("Migrations applied");

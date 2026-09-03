@@ -1,17 +1,20 @@
+import { argv } from "bun";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import initialConfig from "@/fixtures/funnels/initial.json";
 import alternativeConfig from "@/fixtures/funnels/alternative.json";
-import { AnalyticsService } from "@/system/analytics/analytics.service";
-import { closeDatabase, getDatabase, resetDatabaseConnection } from "@/system/database/connection";
-import { runMigrations } from "@/system/database/migrate";
-import { EventService } from "@/system/events/event.service";
+import { createAnalyticsService } from "@/system/analytics/analytics.service";
+import { setEnv } from "@/system/config/environment";
+import { closeDatabase, getDatabase } from "@/system/database/connection";
+import { runDatabaseMigrations } from "@/system/database/migrate";
+import { createEventService } from "@/system/events/event.service";
 import { advanceInfo, createInitialState, submitAnswer } from "@/system/funnel/funnel-engine";
-import { resolveEffectiveConfig } from "@/system/funnel/variant-resolver";
-import { SessionService } from "@/system/sessions/session.service";
-import { VersionService } from "@/system/versions/version.service";
+import type { AdvanceResult } from "@/system/funnel/funnel-engine";
+import type { FunnelSessionState } from "@/system/funnel/config.types";
+import { createSessionService } from "@/system/sessions/session.service";
+import { createVersionService, type ActiveVersionSnapshot } from "@/system/versions/version.service";
 
 function createSeededRandom(seed: number) {
   let state = seed;
@@ -21,35 +24,61 @@ function createSeededRandom(seed: number) {
   };
 }
 
+function applyAdvancedTransition(
+  sessions: ReturnType<typeof createSessionService>,
+  sessionId: string,
+  state: FunnelSessionState,
+  advanced: AdvanceResult,
+) {
+  return sessions.applyForwardTransition(
+    sessionId,
+    {
+      answers: advanced.state.answers,
+      currentStepId: advanced.state.currentStepId,
+      isResult: advanced.state.isResult,
+      history: advanced.state.history,
+    },
+    {
+      fromStepId: advanced.transition.fromStepId,
+      toStepId: advanced.transition.toStepId,
+      toResult: advanced.transition.toResult,
+    },
+    { currentStepId: state.currentStepId, isResult: state.isResult },
+  );
+}
+
 const { values } = parseArgs({
-  args: Bun.argv.slice(2),
+  args: argv.slice(2),
   options: {
     seed: { type: "string", default: "42" },
     sessions: { type: "string", default: "120" },
   },
 });
 
-const seed = Number(values.seed ?? 42);
-const sessionCount = Number(values.sessions ?? 120);
+const seed = Number(values.seed);
+const sessionCount = Number(values.sessions);
 const random = createSeededRandom(seed);
 
 const tempDir = mkdtempSync(join(tmpdir(), "funnel-traffic-"));
 const dbPath = join(tempDir, "traffic.sqlite");
-process.env.SQLITE_PATH = dbPath;
-resetDatabaseConnection();
-const db = getDatabase(dbPath);
-runMigrations({ db });
+setEnv("SQLITE_PATH", dbPath);
+closeDatabase();
+const db = getDatabase();
+runDatabaseMigrations({ database: db });
 
-const versions = new VersionService(db);
+const versions = createVersionService(db);
 const v1 = versions.publish(initialConfig);
-const v2 = versions.publish(alternativeConfig);
-versions.rollbackToVersion(v1.versionId);
 
-const sessions = new SessionService(db);
-const events = new EventService(db);
+const sessions = createSessionService(db);
+const events = createEventService(db);
 const campaigns = ["spring", "summer", "launch"];
+const versionSplit = Math.floor(sessionCount / 2);
+let v2: ActiveVersionSnapshot | null = null;
 
 for (let index = 0; index < sessionCount; index += 1) {
+  if (index === versionSplit) {
+    v2 = versions.publish(alternativeConfig);
+  }
   const variant = random() < 0.5 ? "A" : "B";
   const campaign = campaigns[index % campaigns.length] ?? "spring";
   const session = sessions.createNew({
@@ -59,7 +88,10 @@ for (let index = 0; index < sessionCount; index += 1) {
 
   const config = sessions.getEffectiveConfigForSession(session.sessionId);
   let state = createInitialState(config);
-  const startedId = session.pendingSessionStartedEventId!;
+  const startedId = session.pendingSessionStartedEventId;
+  if (!startedId) {
+    continue;
+  }
   const batch: Array<{
     eventId: string;
     eventName: string;
@@ -101,12 +133,7 @@ for (let index = 0; index < sessionCount; index += 1) {
     let transitionId: string;
     if (step.type === "info") {
       const advanced = advanceInfo(config, state);
-      transitionId = sessions.recordForwardTransition({
-        sessionId: session.sessionId,
-        fromStepId: advanced.transition.fromStepId,
-        toStepId: advanced.transition.toStepId,
-        toResult: advanced.transition.toResult,
-      });
+      ({ transitionId } = applyAdvancedTransition(sessions, session.sessionId, state, advanced));
       state = advanced.state;
     } else {
       const answer =
@@ -116,12 +143,7 @@ for (let index = 0; index < sessionCount; index += 1) {
             ? [step.options[0]?.id ?? "nutrition"]
             : Math.floor(random() * 500);
       const advanced = submitAnswer(config, state, step.id, answer);
-      transitionId = sessions.recordForwardTransition({
-        sessionId: session.sessionId,
-        fromStepId: advanced.transition.fromStepId,
-        toStepId: advanced.transition.toStepId,
-        toResult: advanced.transition.toResult,
-      });
+      ({ transitionId } = applyAdvancedTransition(sessions, session.sessionId, state, advanced));
       state = advanced.state;
       batch.push({
         eventId: crypto.randomUUID(),
@@ -172,14 +194,20 @@ for (let index = 0; index < sessionCount; index += 1) {
   }
 }
 
-const summary = new AnalyticsService(db).getDashboard();
+const dashboard = createAnalyticsService(db).getDashboard();
 console.log(
+  "%s",
   JSON.stringify(
     {
       seed,
       sessions: sessionCount,
-      versions: { initial: v1.versionId, alternative: v2.versionId },
-      summary: summary.summary,
+      versions: { initial: v1.versionId, alternative: v2?.versionId ?? null },
+      summary: dashboard.summary,
+      versionBreakdown: dashboard.comparisons.map((row) => ({
+        versionId: row.versionId,
+        variant: row.variant,
+        started: row.started,
+      })),
     },
     null,
     2,
@@ -187,5 +215,4 @@ console.log(
 );
 
 closeDatabase();
-resetDatabaseConnection();
 rmSync(tempDir, { recursive: true, force: true });

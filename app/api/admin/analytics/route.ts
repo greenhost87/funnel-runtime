@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { requireAdminApi } from "@/system/auth/require-admin";
-import { AnalyticsService } from "@/system/analytics/analytics.service";
+import { createAnalyticsService } from "@/system/analytics/analytics.service";
 import { getDatabase } from "@/system/database/connection";
+import { jsonResponse } from "@/system/http/json";
 
 export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminApi();
@@ -10,6 +11,6 @@ export async function GET(request: NextRequest) {
   }
 
   const campaign = request.nextUrl.searchParams.get("utm_campaign") ?? undefined;
-  const service = new AnalyticsService(getDatabase());
-  return NextResponse.json(service.getDashboard({ utmCampaign: campaign }));
+  const service = createAnalyticsService(getDatabase());
+  return jsonResponse(service.getDashboard({ utmCampaign: campaign }));
 }

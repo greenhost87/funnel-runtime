@@ -1,5 +1,8 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FunnelOptions } from "@/components/layout/funnel/funnel-options";
 import type { MultiSelectStep } from "@/system/funnel/config.types";
 
 type Props = {
@@ -18,21 +21,20 @@ export function MultiSelectScreen({ step, value, onChange }: Props) {
   }
 
   return (
-    <div className="funnel__options" role="group" aria-label={step.title}>
+    <FunnelOptions role="group" aria-label={step.title}>
       {step.options.map((option) => (
-        <label
-          key={option.id}
-          className={`funnel__option${value.includes(option.id) ? " funnel__option--selected" : ""}`}
-        >
-          <input
+        <Label key={option.id} variant="option" selected={value.includes(option.id)}>
+          <Input
             type="checkbox"
             value={option.id}
             checked={value.includes(option.id)}
-            onChange={() => toggle(option.id)}
+            onChange={() => {
+              toggle(option.id);
+            }}
           />
           <span>{option.label}</span>
-        </label>
+        </Label>
       ))}
-    </div>
+    </FunnelOptions>
   );
 }

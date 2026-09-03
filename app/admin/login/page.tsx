@@ -1,7 +1,15 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AdminCardTitle } from "@/components/layout/admin-card-title";
+import { AdminLogin } from "@/components/layout/admin-login";
+import { FormError } from "@/components/layout/form-error";
+import { FormField } from "@/components/layout/form-field";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -9,7 +17,7 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(event: FormEvent) {
+  async function onSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
@@ -28,30 +36,34 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="page-shell">
-      <div className="admin-login">
-        <h1 className="admin-card__title">Admin login</h1>
-        <form onSubmit={onSubmit}>
-          <div className="form-field">
-            <label className="form-label" htmlFor="password">
-              Password
-            </label>
-            <input
+    <PageShell>
+      <AdminLogin>
+        <AdminCardTitle>Admin login</AdminCardTitle>
+        <form
+          onSubmit={(event) => {
+            void onSubmit(event);
+          }}
+        >
+          <FormField>
+            <Label htmlFor="password">Password</Label>
+            <Input
               id="password"
-              className="form-input"
+              variant="form"
               type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+              }}
               autoComplete="current-password"
               required
             />
-          </div>
-          {error ? <p className="form-error">{error}</p> : null}
-          <button className="btn btn--primary" type="submit" disabled={loading}>
+          </FormField>
+          {error ? <FormError>{error}</FormError> : null}
+          <Button variant="primary" type="submit" disabled={loading}>
             {loading ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
         </form>
-      </div>
-    </main>
+      </AdminLogin>
+    </PageShell>
   );
 }

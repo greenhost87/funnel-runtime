@@ -1,9 +1,4 @@
-import { getSessionIdFromCookie, handleBackMutation } from "@/system/http/funnel-api.helpers";
+import { handleBackMutation } from "@/system/http/funnel-api.helpers";
+import { createFunnelMutationPost } from "@/app/api/funnel/create-mutation-post";
 
-export async function POST() {
-  const sessionId = await getSessionIdFromCookie();
-  if (!sessionId) {
-    return Response.json({ error: "No session" }, { status: 401 });
-  }
-  return handleBackMutation(sessionId);
-}
+export const POST = createFunnelMutationPost(handleBackMutation);

@@ -1,29 +1,35 @@
-import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
-import { getDatabase } from "@/system/database/connection";
+import type { NextResponse } from "next/server";
+import type { Database } from "bun:sqlite";
+import { isNodeEnvironment } from "@/system/config/environment";
 import { advanceInfo, goBack, restoreState, submitAnswer } from "@/system/funnel/funnel-engine";
+import type { AdvanceResult } from "@/system/funnel/funnel-engine";
+import type { EffectiveFunnelConfig, FunnelSessionState, StepAnswer } from "@/system/funnel/config.types";
 import { validateAnswer } from "@/system/funnel/answer-validation";
-import type { FunnelApiState, MutationResponse } from "@/system/funnel/funnel-response.types";
-import { resolveEffectiveConfig } from "@/system/funnel/variant-resolver";
-import { SessionService } from "@/system/sessions/session.service";
-import { VersionService } from "@/system/versions/version.service";
+import type { FunnelApiState, MutationResponse } from "@/system/funnel/api-response.schema";
+import { jsonResponse } from "@/system/http/json";
+import { SessionStateConflictError } from "@/system/database/sessions/session.dao";
+import {
+  createSessionService,
+  type SessionSnapshot,
+} from "@/system/sessions/session.service";
+import { createVersionService } from "@/system/versions/version.service";
+import { cookies } from "next/headers";
 
-export const SESSION_COOKIE_NAME = "funnel_session_id";
+const SESSION_COOKIE_NAME = "funnel_session_id";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
+  secure: isNodeEnvironment("production"),
   path: "/",
   maxAge: 60 * 60 * 24 * 30,
 };
 
-export function getServices() {
-  const db = getDatabase();
+export function getServices(db: Database) {
   return {
     db,
-    sessions: new SessionService(db),
-    versions: new VersionService(db),
+    sessions: createSessionService(db),
+    versions: createVersionService(db),
   };
 }
 
@@ -36,11 +42,8 @@ export function setSessionCookie(response: NextResponse, sessionId: string): voi
   response.cookies.set(SESSION_COOKIE_NAME, sessionId, COOKIE_OPTIONS);
 }
 
-export function buildApiState(
-  snapshot: ReturnType<SessionService["getSnapshot"]> extends infer T ? NonNullable<T> : never,
-): FunnelApiState {
-  const { sessions, versions } = getServices();
-  void versions;
+export function buildApiState(db: Database, snapshot: SessionSnapshot): FunnelApiState {
+  const { sessions } = getServices(db);
   const config = sessions.getEffectiveConfigForSession(snapshot.sessionId);
   const state = restoreState(
     config,
@@ -62,14 +65,87 @@ export function buildApiState(
   };
 }
 
-export function buildMutationResponse(
-  snapshot: NonNullable<ReturnType<SessionService["getSnapshot"]>>,
+function buildMutationResponse(
+  db: Database,
+  snapshot: SessionSnapshot,
   transitionId?: string,
 ): MutationResponse {
   return {
-    ...buildApiState(snapshot),
+    ...buildApiState(db, snapshot),
     transitionId,
   };
+}
+
+function jsonError(message: string, status = 400, details?: string[]) {
+  return jsonResponse({ error: message, details }, { status });
+}
+
+function applyForwardResult(
+  db: Database,
+  sessionId: string,
+  snapshot: { currentStepId: string | null; isResult: boolean },
+  result: AdvanceResult,
+) {
+  const { sessions } = getServices(db);
+  return sessions.applyForwardTransition(
+    sessionId,
+    {
+      answers: result.state.answers,
+      currentStepId: result.state.currentStepId,
+      isResult: result.state.isResult,
+      history: result.state.history,
+    },
+    {
+      fromStepId: result.transition.fromStepId,
+      toStepId: result.transition.toStepId,
+      toResult: result.transition.toResult,
+    },
+    { currentStepId: snapshot.currentStepId, isResult: snapshot.isResult },
+  );
+}
+
+function loadSessionContext(db: Database, sessionId: string) {
+  const { sessions } = getServices(db);
+  const snapshot = sessions.getSnapshot(sessionId);
+  if (!snapshot) {
+    return null;
+  }
+  const config = sessions.getEffectiveConfigForSession(sessionId);
+  const currentState = restoreState(
+    config,
+    snapshot.answers,
+    snapshot.currentStepId,
+    snapshot.isResult,
+    snapshot.history,
+  );
+  return { sessions, snapshot, config, currentState };
+}
+
+function missingSessionResponse(): Response {
+  return jsonResponse({ error: "Session not found" }, { status: 404 });
+}
+
+function runForwardMutation(
+  db: Database,
+  sessionId: string,
+  computeResult: (config: EffectiveFunnelConfig, state: FunnelSessionState) => AdvanceResult,
+  invalidMessage: string,
+): Response {
+  const context = loadSessionContext(db, sessionId);
+  if (!context) {
+    return missingSessionResponse();
+  }
+  const { snapshot, config, currentState } = context;
+  try {
+    const result = computeResult(config, currentState);
+    const { snapshot: updated, transitionId } = applyForwardResult(db, sessionId, snapshot, result);
+    return jsonResponse(buildMutationResponse(db, updated, transitionId));
+  } catch (error) {
+    if (error instanceof SessionStateConflictError) {
+      return jsonError(error.message, 409);
+    }
+    return jsonError(error instanceof Error ? error.message : invalidMessage, 400);
+  }
 }
 
 export function parseUtmFromSearchParams(searchParams: URLSearchParams) {
@@ -90,98 +166,63 @@ export function parseVariantOverride(searchParams: URLSearchParams): "A" | "B" |
   return undefined;
 }
 
-export function handleAnswerMutation(sessionId: string, stepId: string, answer: unknown) {
-  const { sessions } = getServices();
-  const snapshot = sessions.getSnapshot(sessionId);
-  if (!snapshot) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+export function handleAnswerMutation(
+  db: Database,
+  sessionId: string,
+  stepId: string,
+  answer: StepAnswer | undefined,
+) {
+  const context = loadSessionContext(db, sessionId);
+  if (!context) {
+    return missingSessionResponse();
   }
-  const config = sessions.getEffectiveConfigForSession(sessionId);
-  const currentStep = config.steps.find((step) => step.id === stepId);
+  const currentStep = context.config.steps.find((step) => step.id === stepId);
   if (!currentStep) {
-    return NextResponse.json({ error: "Unknown step" }, { status: 400 });
+    return jsonResponse({ error: "Unknown step" }, { status: 400 });
   }
   const validation = validateAnswer(currentStep, answer);
   if (!validation.valid) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
+    return jsonResponse({ error: validation.error }, { status: 400 });
   }
-  const currentState = restoreState(
-    config,
-    snapshot.answers,
-    snapshot.currentStepId,
-    snapshot.isResult,
-    snapshot.history,
-  );
-  const result = submitAnswer(config, currentState, stepId, validation.value);
-  const transitionId = sessions.recordForwardTransition({
+  return runForwardMutation(
+    db,
     sessionId,
-    fromStepId: result.transition.fromStepId,
-    toStepId: result.transition.toStepId,
-    toResult: result.transition.toResult,
-  });
-  const updated = sessions.updateSessionState(sessionId, {
-    answers: result.state.answers,
-    currentStepId: result.state.currentStepId,
-    isResult: result.state.isResult,
-    history: result.state.history,
-  });
-  return NextResponse.json(buildMutationResponse(updated, transitionId));
+    (effectiveConfig, currentState) => submitAnswer(effectiveConfig, currentState, stepId, validation.value),
+    "Invalid answer mutation",
+  );
 }
 
-export function handleAdvanceMutation(sessionId: string) {
-  const { sessions } = getServices();
-  const snapshot = sessions.getSnapshot(sessionId);
-  if (!snapshot) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
-  const config = sessions.getEffectiveConfigForSession(sessionId);
-  const currentState = restoreState(
-    config,
-    snapshot.answers,
-    snapshot.currentStepId,
-    snapshot.isResult,
-    snapshot.history,
-  );
-  const result = advanceInfo(config, currentState);
-  const transitionId = sessions.recordForwardTransition({
+export function handleAdvanceMutation(db: Database, sessionId: string): Response {
+  return runForwardMutation(
+    db,
     sessionId,
-    fromStepId: result.transition.fromStepId,
-    toStepId: result.transition.toStepId,
-    toResult: result.transition.toResult,
-  });
-  const updated = sessions.updateSessionState(sessionId, {
-    answers: result.state.answers,
-    currentStepId: result.state.currentStepId,
-    isResult: result.state.isResult,
-    history: result.state.history,
-  });
-  return NextResponse.json(buildMutationResponse(updated, transitionId));
+    (config, currentState) => advanceInfo(config, currentState),
+    "Invalid advance mutation",
+  );
 }
 
-export function handleBackMutation(sessionId: string) {
-  const { sessions } = getServices();
-  const snapshot = sessions.getSnapshot(sessionId);
-  if (!snapshot) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+export function handleBackMutation(db: Database, sessionId: string): Response {
+  const context = loadSessionContext(db, sessionId);
+  if (!context) {
+    return missingSessionResponse();
   }
-  const config = sessions.getEffectiveConfigForSession(sessionId);
-  const currentState = restoreState(
-    config,
-    snapshot.answers,
-    snapshot.currentStepId,
-    snapshot.isResult,
-    snapshot.history,
-  );
-  const nextState = goBack(config, currentState);
-  const updated = sessions.updateSessionState(sessionId, {
+  const nextState = goBack(context.config, context.currentState);
+  const updated = context.sessions.updateSessionState(sessionId, {
     answers: nextState.answers,
     currentStepId: nextState.currentStepId,
     isResult: nextState.isResult,
     history: nextState.history,
   });
-  return NextResponse.json(buildMutationResponse(updated));
+  return jsonResponse(buildMutationResponse(db, updated));
 }
 
-export function jsonError(message: string, status = 400, details?: string[]) {
-  return NextResponse.json({ error: message, details }, { status });
+export async function runSessionMutation(
+  db: Database,
+  handler: (db: Database, sessionId: string) => Response,
+): Promise<Response> {
+  const sessionId = await getSessionIdFromCookie();
+  if (!sessionId) {
+    return jsonResponse({ error: "No session" }, { status: 401 });
+  }
+  return handler(db, sessionId);
 }

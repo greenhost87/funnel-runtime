@@ -10,6 +10,14 @@ import type {
 } from "./config.types";
 import { getStepById, matchesCondition } from "./variant-resolver";
 
+function buildProgress(current: number, total: number) {
+  return {
+    current,
+    total,
+    percent: total > 0 ? Math.round((current / total) * 100) : 0,
+  };
+}
+
 export function createInitialState(config: EffectiveFunnelConfig): FunnelSessionState {
   const firstStep = config.steps[0];
   if (!firstStep) {
@@ -21,7 +29,7 @@ export function createInitialState(config: EffectiveFunnelConfig): FunnelSession
     isResult: false,
     answers: {},
     history: [firstStep.id],
-    progress: { current: 1, total, percent: total > 0 ? Math.round((1 / total) * 100) : 0 },
+    progress: buildProgress(1, total),
   };
 }
 
@@ -39,11 +47,7 @@ export function restoreState(
     isResult,
     answers,
     history,
-    progress: {
-      current,
-      total,
-      percent: total > 0 ? Math.round((current / total) * 100) : 0,
-    },
+    progress: buildProgress(current, total),
   };
 }
 
@@ -53,7 +57,7 @@ function selectTransition(
 ): StepTransition | undefined {
   const conditional = step.transitions.filter((transition) => transition.when);
   for (const transition of conditional) {
-    if (transition.when && matchesCondition(transition.when, answer ?? null)) {
+    if (transition.when && matchesCondition(transition.when, answer)) {
       return transition;
     }
   }
@@ -82,7 +86,7 @@ export type AdvanceResult = {
   };
 };
 
-export function advanceFromStep(
+function advanceFromStep(
   config: EffectiveFunnelConfig,
   state: FunnelSessionState,
   fromStepId: string,
@@ -101,7 +105,19 @@ export function advanceFromStep(
 
   const next = resolveTarget(config, transition.target);
   const answers = answer !== undefined ? { ...state.answers, [fromStepId]: answer } : state.answers;
-  const history = next.isResult ? state.history : [...state.history, next.stepId!];
+  const nextStepId = next.stepId;
+  if (!next.isResult && !nextStepId) {
+    throw new Error(`Transition target step is missing for ${fromStepId}`);
+  }
+  const history = (() => {
+    if (next.isResult) {
+      return state.history;
+    }
+    if (!nextStepId) {
+      throw new Error(`Transition target step is missing for ${fromStepId}`);
+    }
+    return [...state.history, nextStepId];
+  })();
   const total = countReachableSteps(config, answers);
   const current = next.isResult ? total : history.length;
 
@@ -111,11 +127,7 @@ export function advanceFromStep(
       isResult: next.isResult,
       answers,
       history,
-      progress: {
-        current,
-        total,
-        percent: total > 0 ? Math.round((current / total) * 100) : 0,
-      },
+      progress: buildProgress(current, total),
     },
     transition: {
       fromStepId,
@@ -156,7 +168,7 @@ export function advanceInfo(
     throw new Error("No current step");
   }
   const step = getStepById(config, stepId);
-  if (!step || step.type !== "info") {
+  if (step?.type !== "info") {
     throw new Error("Current step is not info");
   }
   return advanceFromStep(config, state, stepId);
@@ -177,17 +189,14 @@ export function goBack(
     currentStepId,
     isResult: false,
     history,
-    progress: {
-      current: history.length,
-      total,
-      percent: total > 0 ? Math.round((history.length / total) * 100) : 0,
-    },
+    progress: buildProgress(history.length, total),
   };
 }
 
 function countReachableSteps(config: EffectiveFunnelConfig, answers: FunnelAnswers): number {
   const visited = new Set<string>();
-  const queue = [config.steps[0]?.id].filter(Boolean) as string[];
+  const firstStepId = config.steps[0]?.id;
+  const queue: string[] = firstStepId ? [firstStepId] : [];
 
   while (queue.length > 0) {
     const stepId = queue.shift();
@@ -211,14 +220,4 @@ function countReachableSteps(config: EffectiveFunnelConfig, answers: FunnelAnswe
   }
 
   return Math.max(visited.size, 1);
-}
-
-export function getCurrentStep(
-  config: EffectiveFunnelConfig,
-  state: FunnelSessionState,
-): FunnelStep | null {
-  if (state.isResult || !state.currentStepId) {
-    return null;
-  }
-  return getStepById(config, state.currentStepId) ?? null;
 }

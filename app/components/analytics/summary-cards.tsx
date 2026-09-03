@@ -1,35 +1,31 @@
 "use client";
 
 import type { AnalyticsSummary } from "@/system/analytics/analytics.service";
-
-function formatRate(value: number | null): string {
-  if (value === null) {
-    return "—";
-  }
-  return `${(value * 100).toFixed(1)}%`;
-}
+import { AnalyticsCard } from "@/components/layout/class-tagged";
+import { AnalyticsCardLabel } from "@/components/layout/analytics/analytics-card-label";
+import { AnalyticsCardValue } from "@/components/layout/analytics/analytics-card-value";
+import { AnalyticsGrid } from "@/components/layout/analytics/analytics-grid";
+import { formatRate } from "@/app/components/analytics/analytics-table-section";
 
 export function SummaryCards({ summary }: { summary: AnalyticsSummary }) {
   return (
-    <div className="analytics-grid">
-      <div className="analytics-card">
-        <div className="analytics-card__label">Sessions started</div>
-        <div className="analytics-card__value">{summary.sessionsStarted}</div>
-      </div>
-      <div className="analytics-card analytics-card--primary">
-        <div className="analytics-card__label">Primary metric: CTA-from-start conversion</div>
-        <div className="analytics-card__value">
-          {formatRate(summary.primaryCtaFromStartConversion)}
-        </div>
-      </div>
-      <div className="analytics-card">
-        <div className="analytics-card__label">Result reach rate</div>
-        <div className="analytics-card__value">{formatRate(summary.resultReachRate)}</div>
-      </div>
-      <div className="analytics-card">
-        <div className="analytics-card__label">CTA CTR (from result viewers)</div>
-        <div className="analytics-card__value">{formatRate(summary.ctaCtr)}</div>
-      </div>
-    </div>
+    <AnalyticsGrid>
+      <AnalyticsCard>
+        <AnalyticsCardLabel>Sessions started</AnalyticsCardLabel>
+        <AnalyticsCardValue>{summary.sessionsStarted}</AnalyticsCardValue>
+      </AnalyticsCard>
+      <AnalyticsCard primary>
+        <AnalyticsCardLabel>Primary metric: CTA-from-start conversion</AnalyticsCardLabel>
+        <AnalyticsCardValue>{formatRate(summary.primaryCtaFromStartConversion)}</AnalyticsCardValue>
+      </AnalyticsCard>
+      <AnalyticsCard>
+        <AnalyticsCardLabel>Result reach rate</AnalyticsCardLabel>
+        <AnalyticsCardValue>{formatRate(summary.resultReachRate)}</AnalyticsCardValue>
+      </AnalyticsCard>
+      <AnalyticsCard>
+        <AnalyticsCardLabel>CTA CTR (from result viewers)</AnalyticsCardLabel>
+        <AnalyticsCardValue>{formatRate(summary.ctaCtr)}</AnalyticsCardValue>
+      </AnalyticsCard>
+    </AnalyticsGrid>
   );
 }

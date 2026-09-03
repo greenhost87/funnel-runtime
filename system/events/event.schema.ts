@@ -1,32 +1,36 @@
 import * as v from "valibot";
 import type { BatchEventInput } from "./event.types";
+import { EventPropertiesSchema } from "./event-properties.schema";
+import { validateEventProperties } from "./event-properties.schema";
 
-const BatchEventItemSchema = v.object({
+export const BatchEventItemSchema = v.object({
   eventId: v.string(),
   eventName: v.string(),
   sessionId: v.string(),
   clientTimestamp: v.string(),
   stepId: v.optional(v.nullable(v.string())),
   transitionId: v.optional(v.nullable(v.string())),
-  properties: v.optional(v.record(v.string(), v.unknown())),
+  properties: v.optional(EventPropertiesSchema),
 });
 
 export const BatchEventSchema = v.object({
   events: v.array(BatchEventItemSchema),
 });
 
-export function parseBatchEvents(input: unknown): BatchEventInput[] {
-  const parsed = v.parse(BatchEventSchema, input);
-  return parsed.events;
-}
+const BatchEventResultSchema = v.union([
+  v.object({ eventId: v.string(), status: v.literal("accepted") }),
+  v.object({ eventId: v.string(), status: v.literal("duplicate") }),
+  v.object({ eventId: v.string(), status: v.literal("rejected"), reason: v.string() }),
+]);
+
+export const BatchEventResponseSchema = v.object({
+  results: v.array(BatchEventResultSchema),
+});
 
 export function validateBatchItem(item: BatchEventInput): string | null {
-  if (item.properties) {
-    for (const key of ["answer", "answers", "rawAnswer", "rawAnswers", "value"]) {
-      if (key in item.properties) {
-        return `Raw answer fields are not allowed in event properties (${key})`;
-      }
-    }
+  const propertyError = validateEventProperties(item.properties);
+  if (propertyError) {
+    return propertyError;
   }
   if (item.eventName === "step_completed" && !item.transitionId) {
     return "step_completed requires transitionId";

@@ -1,5 +1,6 @@
 import type {
   AnswerCondition,
+  AnswerValue,
   EffectiveFunnelConfig,
   FunnelConfig,
   FunnelStep,
@@ -99,9 +100,9 @@ export function getStepById(config: EffectiveFunnelConfig, stepId: string): Funn
 
 export function matchesCondition(
   condition: AnswerCondition,
-  answer: string | string[] | number | null | undefined,
+  answer: AnswerValue | undefined,
 ): boolean {
-  if (answer === null || answer === undefined) {
+  if (answer === undefined) {
     return false;
   }
 

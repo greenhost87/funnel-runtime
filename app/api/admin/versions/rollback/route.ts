@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/system/auth/require-admin";
 import { getDatabase } from "@/system/database/connection";
-import { VersionService } from "@/system/versions/version.service";
+import { RollbackRequestSchema } from "@/system/funnel/api-response.schema";
+import { jsonResponse, parseJsonFromReadable } from "@/system/http/json";
+import { createVersionService } from "@/system/versions/version.service";
 
 export async function POST(request: Request) {
   const unauthorized = await requireAdminApi();
@@ -9,17 +10,14 @@ export async function POST(request: Request) {
     return unauthorized;
   }
 
-  const body = (await request.json()) as { versionId?: string };
-  if (!body.versionId) {
-    return NextResponse.json({ error: "versionId is required" }, { status: 400 });
-  }
+  const body = await parseJsonFromReadable(request, RollbackRequestSchema);
 
   try {
-    const service = new VersionService(getDatabase());
+    const service = createVersionService(getDatabase());
     const active = service.rollbackToVersion(body.versionId);
-    return NextResponse.json({ active });
+    return jsonResponse({ active });
   } catch (error) {
-    return NextResponse.json(
+    return jsonResponse(
       { error: error instanceof Error ? error.message : "Rollback failed" },
       { status: 400 },
     );

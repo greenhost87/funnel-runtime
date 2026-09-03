@@ -4,11 +4,12 @@ import {
   verifyAdminPassword,
   verifyAdminSessionToken,
 } from "@/system/auth/admin-session";
+import { setEnv } from "@/system/config/environment";
 
 describe("admin session", () => {
   test("valid password and token lifecycle", () => {
-    process.env.ADMIN_PASSWORD = "test-password";
-    process.env.ADMIN_SIGNING_SECRET = "test-signing-secret";
+    setEnv("ADMIN_PASSWORD", "test-password");
+    setEnv("ADMIN_SIGNING_SECRET", "test-signing-secret");
     expect(verifyAdminPassword("test-password")).toBe(true);
     expect(verifyAdminPassword("wrong")).toBe(false);
     const token = createAdminSessionToken();

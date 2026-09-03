@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { SecondaryActionButton } from "@/components/ui/secondary-action-button";
+import { AdminNav as AdminNavRoot } from "@/components/layout/admin/admin-nav";
 
-export function AdminLogoutButton() {
+function AdminLogoutButton() {
   const router = useRouter();
 
   async function logout() {
@@ -13,18 +15,18 @@ export function AdminLogoutButton() {
   }
 
   return (
-    <button className="btn btn--secondary" type="button" onClick={() => void logout()}>
+    <SecondaryActionButton onClick={() => void logout()}>
       Logout
-    </button>
+    </SecondaryActionButton>
   );
 }
 
-export function AdminNav() {
+export function AdminShellNav() {
   return (
-    <nav className="admin-nav">
+    <AdminNavRoot>
       <Link href="/admin/versions">Versions</Link>
       <Link href="/admin/analytics">Analytics</Link>
       <AdminLogoutButton />
-    </nav>
+    </AdminNavRoot>
   );
 }

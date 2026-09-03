@@ -1,17 +1,16 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import initialConfig from "@/fixtures/funnels/initial.json";
-import { AnalyticsService } from "@/system/analytics/analytics.service";
-import { getDatabase } from "@/system/database/connection";
-import { EventService } from "@/system/events/event.service";
-import { SessionService } from "@/system/sessions/session.service";
-import { VersionService } from "@/system/versions/version.service";
-import { createTestDatabase, destroyTestDatabase } from "@/tests/setup/test-database";
+import { createAnalyticsService } from "@/system/analytics/analytics.service";
+import { createEventService } from "@/system/events/event.service";
+import { createSessionService } from "@/system/sessions/session.service";
+import { createVersionService } from "@/system/versions/version.service";
+import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
 
-function seedAnalyticsScenario() {
-  const sessions = new SessionService(getDatabase());
-  const events = new EventService(getDatabase());
+const currentDatabase = useIsolatedTestDatabase(import.meta.path);
+
+function seedAnalyticsScenario(db: ReturnType<typeof currentDatabase>) {
+  const sessions = createSessionService(db);
+  const events = createEventService(db);
 
   const s1 = sessions.createNew({ variantOverride: "A", utm: { utmCampaign: "alpha" } });
   const s2 = sessions.createNew({ variantOverride: "B", utm: { utmCampaign: "beta" } });
@@ -23,15 +22,21 @@ function seedAnalyticsScenario() {
     toResult: false,
   });
 
+  const startedId1 = s1.pendingSessionStartedEventId;
+  const startedId2 = s2.pendingSessionStartedEventId;
+  if (!startedId1 || !startedId2) {
+    throw new Error("Expected pending session_started event ids");
+  }
+
   const batch = [
     {
-      eventId: s1.pendingSessionStartedEventId!,
+      eventId: startedId1,
       eventName: "session_started",
       sessionId: s1.sessionId,
       clientTimestamp: "2026-01-02T10:00:00.000Z",
     },
     {
-      eventId: s2.pendingSessionStartedEventId!,
+      eventId: startedId2,
       eventName: "session_started",
       sessionId: s2.sessionId,
       clientTimestamp: "2026-01-02T10:01:00.000Z",
@@ -82,15 +87,11 @@ function seedAnalyticsScenario() {
 }
 
 describe("analytics service", () => {
-  beforeEach(() => {
-    destroyTestDatabase();
-    createTestDatabase();
-    new VersionService(getDatabase()).publish(initialConfig);
-    seedAnalyticsScenario();
-  });
-
   test("computes unique session metrics and primary conversion", () => {
-    const dashboard = new AnalyticsService(getDatabase()).getDashboard();
+    const db = currentDatabase();
+    createVersionService(db).publish(initialConfig);
+    seedAnalyticsScenario(db);
+    const dashboard = createAnalyticsService(db).getDashboard();
     expect(dashboard.summary.sessionsStarted).toBe(2);
     expect(dashboard.summary.primaryCtaFromStartConversion).toBe(0.5);
     expect(dashboard.summary.resultReachRate).toBe(0.5);
@@ -98,11 +99,14 @@ describe("analytics service", () => {
   });
 
   test("filters by utm campaign without divide-by-zero", () => {
-    const alpha = new AnalyticsService(getDatabase()).getDashboard({ utmCampaign: "alpha" });
+    const db = currentDatabase();
+    createVersionService(db).publish(initialConfig);
+    seedAnalyticsScenario(db);
+    const alpha = createAnalyticsService(db).getDashboard({ utmCampaign: "alpha" });
     expect(alpha.summary.sessionsStarted).toBe(1);
     expect(alpha.summary.primaryCtaFromStartConversion).toBe(1);
 
-    const missing = new AnalyticsService(getDatabase()).getDashboard({ utmCampaign: "missing" });
+    const missing = createAnalyticsService(db).getDashboard({ utmCampaign: "missing" });
     expect(missing.summary.sessionsStarted).toBe(0);
     expect(missing.summary.primaryCtaFromStartConversion).toBeNull();
   });

@@ -1,10 +1,11 @@
-import type { AnswerValue, FunnelAnswers, FunnelStep } from "./config.types";
+import * as v from "valibot";
+import type { AnswerValue, FunnelAnswers, FunnelStep, StepAnswer } from "./config.types";
 
 export type ValidationResult =
   | { valid: true; value: AnswerValue }
   | { valid: false; error: string };
 
-export function validateAnswer(step: FunnelStep, raw: unknown): ValidationResult {
+export function validateAnswer(step: FunnelStep, raw: StepAnswer | undefined): ValidationResult {
   switch (step.type) {
     case "single-select":
       return validateSingleSelect(step, raw);
@@ -14,16 +15,14 @@ export function validateAnswer(step: FunnelStep, raw: unknown): ValidationResult
       return validateNumber(step, raw);
     case "info":
       return { valid: false, error: "Info steps do not accept answers" };
-    default: {
-      const _exhaustive: never = step;
-      return _exhaustive;
-    }
+    default:
+      return { valid: false, error: "Unsupported step type" };
   }
 }
 
 function validateSingleSelect(
   step: Extract<FunnelStep, { type: "single-select" }>,
-  raw: unknown,
+  raw: StepAnswer | undefined,
 ): ValidationResult {
   if (typeof raw !== "string") {
     return { valid: false, error: "Answer must be a string option id" };
@@ -38,14 +37,17 @@ function validateSingleSelect(
   return { valid: true, value: raw };
 }
 
+const MultiSelectAnswerSchema = v.array(v.string());
+
 function validateMultiSelect(
   step: Extract<FunnelStep, { type: "multi-select" }>,
-  raw: unknown,
+  raw: StepAnswer | undefined,
 ): ValidationResult {
-  if (!Array.isArray(raw) || !raw.every((item) => typeof item === "string")) {
+  const parsed = v.safeParse(MultiSelectAnswerSchema, raw);
+  if (!parsed.success) {
     return { valid: false, error: "Answer must be an array of option ids" };
   }
-  const unique = [...new Set(raw)];
+  const unique = [...new Set(parsed.output)];
   for (const id of unique) {
     if (!step.options.some((option) => option.id === id)) {
       return { valid: false, error: `Unknown option selected: ${id}` };
@@ -64,7 +66,7 @@ function validateMultiSelect(
 
 function validateNumber(
   step: Extract<FunnelStep, { type: "number" }>,
-  raw: unknown,
+  raw: StepAnswer | undefined,
 ): ValidationResult {
   const value = typeof raw === "string" ? Number(raw) : raw;
   if (typeof value !== "number" || Number.isNaN(value)) {

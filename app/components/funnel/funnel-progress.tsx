@@ -1,20 +1,25 @@
 "use client";
 
+import { FunnelProgress as FunnelProgressRoot } from "@/components/layout/funnel/funnel-progress";
+import { FunnelProgressBar } from "@/components/layout/funnel/funnel-progress-bar";
+import { FunnelProgressFill } from "@/components/layout/funnel/funnel-progress-fill";
+import { FunnelProgressLabel } from "@/components/layout/funnel/funnel-progress-label";
+
 type FunnelProgressProps = {
   current: number;
   total: number;
   percent: number;
 };
 
-export function FunnelProgress({ current, total, percent }: FunnelProgressProps) {
+export function FunnelStepProgress({ current, total, percent }: FunnelProgressProps) {
   return (
-    <div className="funnel__progress">
-      <div className="funnel__progress-bar" aria-hidden="true">
-        <div className="funnel__progress-fill" style={{ width: `${percent}%` }} />
-      </div>
-      <p className="funnel__progress-label">
+    <FunnelProgressRoot>
+      <FunnelProgressBar aria-hidden>
+        <FunnelProgressFill percent={percent} />
+      </FunnelProgressBar>
+      <FunnelProgressLabel>
         Step {current} of {total}
-      </p>
-    </div>
+      </FunnelProgressLabel>
+    </FunnelProgressRoot>
   );
 }

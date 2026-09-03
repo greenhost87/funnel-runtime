@@ -1,16 +1,41 @@
 "use client";
 
-import type { FunnelStep } from "@/system/funnel/config.types";
+import { FunnelConfigError } from "@/components/layout/class-tagged";
+import type { FunnelStep, StepAnswer } from "@/system/funnel/config.types";
 import { InfoScreen } from "@/app/components/funnel/info-screen";
 import { MultiSelectScreen } from "@/app/components/funnel/multi-select-screen";
 import { NumberScreen } from "@/app/components/funnel/number-screen";
 import { SingleSelectScreen } from "@/app/components/funnel/single-select-screen";
+import * as v from "valibot";
+
+const DraftStringSchema = v.string();
+const DraftStringArraySchema = v.array(v.string());
 
 type Props = {
   step: FunnelStep;
-  draftAnswer: unknown;
-  onDraftChange: (value: unknown) => void;
+  draftAnswer: StepAnswer | null;
+  onDraftChange: (value: StepAnswer | null) => void;
 };
+
+function parseStringDraft(draftAnswer: StepAnswer | null): string | null {
+  const parsed = v.safeParse(DraftStringSchema, draftAnswer);
+  return parsed.success ? parsed.output : null;
+}
+
+function parseStringArrayDraft(draftAnswer: StepAnswer | null): string[] {
+  const parsed = v.safeParse(DraftStringArraySchema, draftAnswer);
+  return parsed.success ? parsed.output : [];
+}
+
+function formatDraftNumber(draftAnswer: StepAnswer | null): string {
+  if (typeof draftAnswer === "string") {
+    return draftAnswer;
+  }
+  if (typeof draftAnswer === "number") {
+    return String(draftAnswer);
+  }
+  return "";
+}
 
 export function ScreenRenderer({ step, draftAnswer, onDraftChange }: Props) {
   switch (step.type) {
@@ -18,7 +43,7 @@ export function ScreenRenderer({ step, draftAnswer, onDraftChange }: Props) {
       return (
         <SingleSelectScreen
           step={step}
-          value={typeof draftAnswer === "string" ? draftAnswer : null}
+          value={parseStringDraft(draftAnswer)}
           onChange={onDraftChange}
         />
       );
@@ -26,7 +51,7 @@ export function ScreenRenderer({ step, draftAnswer, onDraftChange }: Props) {
       return (
         <MultiSelectScreen
           step={step}
-          value={Array.isArray(draftAnswer) ? (draftAnswer as string[]) : []}
+          value={parseStringArrayDraft(draftAnswer)}
           onChange={onDraftChange}
         />
       );
@@ -34,19 +59,17 @@ export function ScreenRenderer({ step, draftAnswer, onDraftChange }: Props) {
       return (
         <NumberScreen
           step={step}
-          value={typeof draftAnswer === "string" ? draftAnswer : (draftAnswer?.toString() ?? "")}
+          value={formatDraftNumber(draftAnswer)}
           onChange={onDraftChange}
         />
       );
     case "info":
       return <InfoScreen step={step} />;
-    default: {
-      const unknownStep = step as { type?: string };
+    default:
       return (
-        <div className="funnel__config-error" role="alert">
-          Unsupported step type: {unknownStep.type ?? "unknown"}
-        </div>
+        <FunnelConfigError as="div" role="alert">
+          Unsupported step type
+        </FunnelConfigError>
       );
-    }
   }
 }

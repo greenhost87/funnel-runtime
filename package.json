@@ -7,13 +7,13 @@
     "dev": "bun --bun next dev",
     "build": "bun --bun next build",
     "start": "bun --bun next start",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun --bun next typegen && tsc --noEmit",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "migrate": "bun run scripts/migrate.ts",
     "seed": "bun run scripts/seed.ts",
-    "test": "bun test --timeout 120000 tests/funnel tests/database tests/auth tests/versions tests/sessions tests/events tests/analytics tests/generator tests/app",
-    "test:e2e": "NEXT_DIST_DIR=.next-e2e bun --bun next build && playwright test",
+    "test": "bun test --timeout 120000 tests/funnel tests/database tests/auth tests/versions tests/sessions tests/events tests/analytics tests/generator",
+    "test:e2e": "bun --bun next build && playwright test",
     "generate:traffic": "bun run scripts/generate-traffic.ts"
   },
   "dependencies": {

@@ -1,8 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FunnelApiState, MutationResponse } from "@/system/funnel/funnel-response.types";
-import type { FunnelStep } from "@/system/funnel/config.types";
+import {
+  ErrorResponseSchema,
+  FunnelApiStateSchema,
+  MutationResponseSchema,
+} from "@/system/funnel/api-response.schema";
+import type { FunnelApiState, MutationResponse } from "@/system/funnel/api-response.schema";
+import type { FunnelStep, StepAnswer } from "@/system/funnel/config.types";
+import { parseJsonFromReadable } from "@/system/http/json";
 import {
   createEventId,
   createEventIntent,
@@ -15,7 +21,7 @@ type ControllerState = {
   loading: boolean;
   error: string | null;
   validationError: string | null;
-  draftAnswer: unknown;
+  draftAnswer: StepAnswer | null;
 };
 
 export function useFunnelController(initialQuery = "") {
@@ -32,51 +38,67 @@ export function useFunnelController(initialQuery = "") {
   const loadStarted = useRef(false);
 
   const stableEventId = useCallback((key: string) => {
-    if (!eventIds.current[key]) {
-      eventIds.current[key] = createEventId();
-    }
+    eventIds.current[key] ??= createEventId();
     return eventIds.current[key];
   }, []);
+
+  const emitStepViewed = useCallback(
+    async (data: FunnelApiState, stepId: string) => {
+      const viewKey = `${data.sessionId}:${stepId}`;
+      if (viewedSteps.current.has(viewKey)) {
+        return;
+      }
+      viewedSteps.current.add(viewKey);
+      await sendEventWithRetry(
+        createEventIntent({
+          eventId: stableEventId(`step_viewed:${viewKey}`),
+          eventName: "step_viewed",
+          sessionId: data.sessionId,
+          stepId,
+        }),
+      );
+    },
+    [stableEventId],
+  );
+
+  const emitResultViewed = useCallback(
+    async (data: FunnelApiState) => {
+      const key = `result_viewed:${data.sessionId}`;
+      await sendEventWithRetry(
+        createEventIntent({
+          eventId: stableEventId(key),
+          eventName: "result_viewed",
+          sessionId: data.sessionId,
+        }),
+      );
+    },
+    [stableEventId],
+  );
 
   const bootstrapEvents = useCallback(
     async (data: FunnelApiState) => {
       if (data.pendingSessionStarted && !sessionStartedSent.current) {
-        sessionStartedSent.current = true;
-        await sendEventWithRetry(
+        const result = await sendEventWithRetry(
           createEventIntent({
             eventId: data.pendingSessionStarted.eventId,
             eventName: "session_started",
             sessionId: data.sessionId,
           }),
         );
-      }
-
-      if (data.state.currentStepId && !data.state.isResult) {
-        const viewKey = `${data.sessionId}:${data.state.currentStepId}`;
-        if (!viewedSteps.current.has(viewKey)) {
-          viewedSteps.current.add(viewKey);
-          await sendEventWithRetry(
-            createEventIntent({
-              eventId: stableEventId(`step_viewed:${viewKey}`),
-              eventName: "step_viewed",
-              sessionId: data.sessionId,
-              stepId: data.state.currentStepId,
-            }),
-          );
+        if (result.status === "accepted" || result.status === "duplicate") {
+          sessionStartedSent.current = true;
         }
       }
 
+      if (data.state.currentStepId && !data.state.isResult) {
+        await emitStepViewed(data, data.state.currentStepId);
+      }
+
       if (data.state.isResult) {
-        await sendEventWithRetry(
-          createEventIntent({
-            eventId: stableEventId(`result_viewed:${data.sessionId}`),
-            eventName: "result_viewed",
-            sessionId: data.sessionId,
-          }),
-        );
+        await emitResultViewed(data);
       }
     },
-    [stableEventId],
+    [emitResultViewed, emitStepViewed],
   );
 
   const loadSession = useCallback(async () => {
@@ -86,7 +108,7 @@ export function useFunnelController(initialQuery = "") {
       setState((prev) => ({ ...prev, loading: false, error: "Failed to load session" }));
       return;
     }
-    const data = (await response.json()) as FunnelApiState;
+    const data = await parseJsonFromReadable(response, FunnelApiStateSchema);
     setState((prev) => ({
       ...prev,
       data,
@@ -105,40 +127,13 @@ export function useFunnelController(initialQuery = "") {
     void loadSession();
   }, [loadSession]);
 
-  async function emitStepViewed(data: FunnelApiState, stepId: string) {
-    const viewKey = `${data.sessionId}:${stepId}`;
-    if (viewedSteps.current.has(viewKey)) {
-      return;
-    }
-    viewedSteps.current.add(viewKey);
-    await sendEventWithRetry(
-      createEventIntent({
-        eventId: stableEventId(`step_viewed:${viewKey}`),
-        eventName: "step_viewed",
-        sessionId: data.sessionId,
-        stepId,
-      }),
-    );
-  }
-
-  async function emitResultViewed(data: FunnelApiState) {
-    const key = `result_viewed:${data.sessionId}`;
-    await sendEventWithRetry(
-      createEventIntent({
-        eventId: stableEventId(key),
-        eventName: "result_viewed",
-        sessionId: data.sessionId,
-      }),
-    );
-  }
-
   async function applyMutation(response: Response): Promise<MutationResponse | null> {
     if (!response.ok) {
-      const payload = (await response.json()) as { error?: string };
-      setState((prev) => ({ ...prev, validationError: payload.error ?? "Request failed" }));
+      const payload = await parseJsonFromReadable(response, ErrorResponseSchema);
+      setState((prev) => ({ ...prev, validationError: payload.error }));
       return null;
     }
-    const payload = (await response.json()) as MutationResponse;
+    const payload = await parseJsonFromReadable(response, MutationResponseSchema);
     setState((prev) => ({
       ...prev,
       data: payload,
@@ -164,6 +159,7 @@ export function useFunnelController(initialQuery = "") {
       return;
     }
 
+    const transitionKey = payload.transitionId ?? "missing";
     await sendEventBatch([
       createEventIntent({
         eventId: stableEventId(`answer_submitted:${current.sessionId}:${stepId}`),
@@ -172,7 +168,7 @@ export function useFunnelController(initialQuery = "") {
         stepId,
       }),
       createEventIntent({
-        eventId: stableEventId(`step_completed:${payload.transitionId}`),
+        eventId: stableEventId(`step_completed:${transitionKey}`),
         eventName: "step_completed",
         sessionId: current.sessionId,
         stepId,
@@ -228,7 +224,9 @@ export function useFunnelController(initialQuery = "") {
     }
     await sendEventWithRetry(
       createEventIntent({
-        eventId: stableEventId(`back_clicked:${current.sessionId}:${Date.now()}`),
+        eventId: stableEventId(
+          `back_clicked:${current.sessionId}:${current.state.history.join(">")}`,
+        ),
         eventName: "back_clicked",
         sessionId: current.sessionId,
         stepId: current.state.currentStepId ?? undefined,
@@ -256,7 +254,7 @@ export function useFunnelController(initialQuery = "") {
     }
   }
 
-  function setDraftAnswer(value: unknown) {
+  function setDraftAnswer(value: StepAnswer | null) {
     setState((prev) => ({ ...prev, draftAnswer: value, validationError: null }));
   }
 

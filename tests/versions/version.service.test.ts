@@ -1,24 +1,21 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import initialConfig from "@/fixtures/funnels/initial.json";
 import alternativeConfig from "@/fixtures/funnels/alternative.json";
-import { getDatabase } from "@/system/database/connection";
-import { VersionDao } from "@/system/database/versions/version.dao";
-import { VersionService } from "@/system/versions/version.service";
-import { createTestDatabase, destroyTestDatabase } from "@/tests/setup/test-database";
+import { createVersionDao } from "@/system/database/versions/version.dao";
+import { createVersionService } from "@/system/versions/version.service";
+import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
+
+const currentDatabase = useIsolatedTestDatabase(import.meta.path);
 
 describe("version service", () => {
-  beforeEach(() => {
-    destroyTestDatabase();
-    createTestDatabase();
-  });
-
   test("publish, immutable snapshots, rollback", () => {
-    const service = new VersionService(getDatabase());
+    const db = currentDatabase();
+    const service = createVersionService(db);
     const first = service.publish(initialConfig);
     const second = service.publish(alternativeConfig);
     expect(second.versionId).not.toBe(first.versionId);
 
-    const dao = new VersionDao(getDatabase());
+    const dao = createVersionDao(db);
     expect(dao.getVersionById(first.versionId)).not.toBeNull();
     expect(dao.getVersionById(second.versionId)).not.toBeNull();
 

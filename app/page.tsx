@@ -1,4 +1,6 @@
 import { FunnelClient } from "@/app/components/funnel/funnel.client";
+import { PageContent } from "@/components/layout/page-content";
+import { PageShell } from "@/components/layout/page-shell";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -14,12 +16,11 @@ function toQueryString(params: SearchParams): string {
 }
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const resolvedParams = await searchParams;
   return (
-    <main className="page-shell">
-      <div className="page-content">
-        <FunnelClient initialQuery={toQueryString(resolvedParams)} />
-      </div>
-    </main>
+    <PageShell>
+      <PageContent>
+        <FunnelClient initialQuery={toQueryString(await searchParams)} />
+      </PageContent>
+    </PageShell>
   );
 }

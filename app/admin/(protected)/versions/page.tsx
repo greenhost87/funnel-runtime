@@ -1,11 +1,16 @@
 import { getDatabase } from "@/system/database/connection";
-import { VersionService } from "@/system/versions/version.service";
+import { createVersionService } from "@/system/versions/version.service";
 import { VersionsClient } from "@/app/admin/(protected)/versions/versions.client";
 
-export default async function VersionsPage() {
-  const service = new VersionService(getDatabase());
-  const active = service.getActive();
-  const history = service.getHistory();
+function getVersionsPageData() {
+  const service = createVersionService(getDatabase());
+  return {
+    active: service.getActive(),
+    history: service.getHistory(),
+  };
+}
 
+export default function VersionsPage() {
+  const { active, history } = getVersionsPageData();
   return <VersionsClient initialActive={active} initialHistory={history} />;
 }
