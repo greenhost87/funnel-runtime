@@ -17,16 +17,16 @@ Open `http://localhost:3000` for the funnel and `http://localhost:3000/admin/log
 
 ## Environment
 
-| Variable               | Purpose                                                                     |
-| ---------------------- | --------------------------------------------------------------------------- |
-| `SQLITE_PATH`          | Persistent SQLite file; defaults to `data/app.sqlite`                       |
-| `APP_URL`              | External application URL                                                    |
-| `ADMIN_PASSWORD`       | Password for the internal pages                                             |
-| `ADMIN_SIGNING_SECRET` | HMAC secret for the admin session cookie                                    |
-| `BASE_PATH`            | Optional URL prefix for production deployment and server-side path helpers |
-| `NEXT_PUBLIC_BASE_PATH`| Optional client-side URL prefix; falls back to `BASE_PATH` when unset       |
-| `LOG_LEVEL`            | Optional production log verbosity; see `.github/workflows/scripts/production.env.example`      |
-| `DATA_RETENTION_*`     | Optional production retention schedule; see `.github/workflows/scripts/production.env.example` |
+| Variable                | Purpose                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| `SQLITE_PATH`           | Persistent SQLite file; defaults to `data/app.sqlite`                                          |
+| `APP_URL`               | External application URL                                                                       |
+| `ADMIN_PASSWORD`        | Password for the internal pages                                                                |
+| `ADMIN_SIGNING_SECRET`  | HMAC secret for the admin session cookie                                                       |
+| `BASE_PATH`             | Optional URL prefix for production deployment and server-side path helpers                     |
+| `NEXT_PUBLIC_BASE_PATH` | Optional client-side URL prefix; falls back to `BASE_PATH` when unset                          |
+| `LOG_LEVEL`             | Optional production log verbosity; see `.github/workflows/scripts/production.env.example`      |
+| `DATA_RETENTION_*`      | Optional production retention schedule; see `.github/workflows/scripts/production.env.example` |
 
 ## Commands
 
