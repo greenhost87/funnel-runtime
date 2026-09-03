@@ -4,7 +4,7 @@ async function adminLogin(page: Page) {
   await page.goto("/admin/login");
   await page.getByLabel("Password").fill("e2e-admin");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText("Funnel versions")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Funnel versions" })).toBeVisible();
 }
 
 test.describe("admin date input", () => {
