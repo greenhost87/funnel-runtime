@@ -149,6 +149,42 @@ function useDateInputCalendar(
   return inputRef;
 }
 
+function useBulmaBridgeReady(): boolean {
+  const [scriptReady, setScriptReady] = useState(false);
+
+  useEffect(() => {
+    void waitForBulmaDateBridge().then(() => {
+      setScriptReady(true);
+    });
+  }, []);
+
+  return scriptReady;
+}
+
+function useDateDisplayValue(
+  value: string | undefined,
+  defaultValue: string | undefined,
+  onChange?: (value: string) => void,
+) {
+  const [displayValue, setDisplayValue] = useState(value ?? defaultValue ?? "");
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    setDisplayValue(value ?? defaultValue ?? "");
+  }, [value, defaultValue]);
+
+  const handleDisplayChange = (nextValue: string) => {
+    setDisplayValue(nextValue);
+    onChangeRef.current?.(nextValue);
+  };
+
+  return { displayValue, handleDisplayChange };
+}
+
 export function DateInput({
   id,
   name,
@@ -159,23 +195,14 @@ export function DateInput({
   onChange,
   "aria-label": ariaLabel,
 }: DateInputProps) {
-  const [scriptReady, setScriptReady] = useState(false);
+  const scriptReady = useBulmaBridgeReady();
   const [shouldInjectScripts] = useState(() => markCalendarScriptsRequested());
-  const [displayValue, setDisplayValue] = useState(value ?? defaultValue ?? "");
-  const inputRef = useDateInputCalendar(value, defaultValue, scriptReady, (nextValue) => {
-    setDisplayValue(nextValue);
-    onChange?.(nextValue);
-  });
-
-  useEffect(() => {
-    setDisplayValue(value ?? defaultValue ?? "");
-  }, [value, defaultValue]);
-
-  useEffect(() => {
-    void waitForBulmaDateBridge().then(() => {
-      setScriptReady(true);
-    });
-  }, []);
+  const { displayValue, handleDisplayChange } = useDateDisplayValue(
+    value,
+    defaultValue,
+    onChange,
+  );
+  const inputRef = useDateInputCalendar(value, defaultValue, scriptReady, handleDisplayChange);
 
   return (
     <>
