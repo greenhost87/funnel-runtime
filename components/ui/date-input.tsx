@@ -119,17 +119,16 @@ function attachDateCalendar(
 function useDateInputCalendar(
   value: string | undefined,
   defaultValue: string | undefined,
-  disabled: boolean,
   scriptReady: boolean,
-  onChange?: (value: string) => void,
+  onDisplayChange: (value: string) => void,
 ) {
   const inputRef = useRef<HTMLInputElement>(null);
   const attachedRef = useRef(false);
-  const onChangeRef = useRef(onChange);
+  const onDisplayChangeRef = useRef(onDisplayChange);
 
   useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
+    onDisplayChangeRef.current = onDisplayChange;
+  }, [onDisplayChange]);
 
   useEffect(() => {
     if (!scriptReady) {
@@ -142,16 +141,10 @@ function useDateInputCalendar(
     }
 
     attachDateCalendar(input, value ?? defaultValue ?? "", (nextValue) => {
-      onChangeRef.current?.(nextValue);
+      onDisplayChangeRef.current(nextValue);
     });
     attachedRef.current = true;
   }, [defaultValue, scriptReady, value]);
-
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.disabled = disabled || !scriptReady;
-    }
-  }, [disabled, scriptReady]);
 
   return inputRef;
 }
@@ -168,7 +161,15 @@ export function DateInput({
 }: DateInputProps) {
   const [scriptReady, setScriptReady] = useState(false);
   const [shouldInjectScripts] = useState(() => markCalendarScriptsRequested());
-  const inputRef = useDateInputCalendar(value, defaultValue, disabled, scriptReady, onChange);
+  const [displayValue, setDisplayValue] = useState(value ?? defaultValue ?? "");
+  const inputRef = useDateInputCalendar(value, defaultValue, scriptReady, (nextValue) => {
+    setDisplayValue(nextValue);
+    onChange?.(nextValue);
+  });
+
+  useEffect(() => {
+    setDisplayValue(value ?? defaultValue ?? "");
+  }, [value, defaultValue]);
 
   useEffect(() => {
     void waitForBulmaDateBridge().then(() => {
@@ -188,7 +189,9 @@ export function DateInput({
           type="text"
           autoComplete="off"
           readOnly
-          disabled={disabled || !scriptReady}
+          value={displayValue}
+          onChange={() => {}}
+          disabled={disabled}
           required={required}
           aria-label={ariaLabel}
         />

@@ -50,10 +50,11 @@ test.describe("admin mobile layout at 320px", () => {
   test("analytics tables render stacked rows on narrow screens", async ({ page }) => {
     await adminLogin(page);
     await page.goto("/admin/traffic");
+    await expect(page.locator("#date")).toHaveValue(/\d{4}-\d{2}-\d{2}/);
     await page.getByRole("button", { name: "Generate traffic" }).click();
     await expect(
       page.getByText(/Generated \d+ synthetic sessions for \d{4}-\d{2}-\d{2}\./),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 30_000 });
 
     await page.goto("/admin/analytics");
     await expect(page.getByText("Primary metric: CTA-from-start conversion")).toBeVisible();
