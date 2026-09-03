@@ -1,6 +1,14 @@
-import { forwardRef, type ChangeEvent, type FocusEvent, type MouseEvent, type ReactNode } from "react";
+import {
+  forwardRef,
+  type ChangeEvent,
+  type FocusEvent,
+  type MouseEvent,
+  type ReactNode,
+  type Ref,
+} from "react";
 
 type SelectProps = {
+  label?: string;
   className?: string;
   id?: string;
   name?: string;
@@ -17,13 +25,38 @@ type SelectProps = {
   children?: ReactNode;
 };
 
-function selectClassName(className: string | undefined): string {
-  return ["form-select", className].filter(Boolean).join(" ");
+function selectFieldView(label: string, id: string | undefined, control: ReactNode): ReactNode {
+  return (
+    <div className="field">
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="control">{control}</div>
+    </div>
+  );
+}
+
+function selectControlView(ref: Ref<HTMLSelectElement>, props: SelectProps): ReactNode {
+  const { label: _label, id, className, children, ...rest } = props;
+
+  return (
+    <div className="select is-fullwidth">
+      <select ref={ref} id={id} className={className} {...rest}>
+        {children}
+      </select>
+    </div>
+  );
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { className, ...props },
+  props,
   ref,
-) {
-  return <select ref={ref} className={selectClassName(className)} {...props} />;
+): ReactNode {
+  const control = selectControlView(ref, props);
+
+  if (!props.label) {
+    return control;
+  }
+
+  return selectFieldView(props.label, props.id, control);
 });

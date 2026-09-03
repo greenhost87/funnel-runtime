@@ -18,7 +18,7 @@ function labelClassName(
   className: string | undefined,
 ): string {
   return [
-    variant === "form" ? "form-label" : "funnel__option",
+    variant === "form" ? "label" : "funnel__option",
     variant === "option" && selected ? "funnel__option--selected" : "",
     className,
   ]

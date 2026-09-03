@@ -6,5 +6,6 @@ type AdminCardTitleProps = {
 };
 
 export function AdminCardTitle({ as: Tag = "h1", children }: AdminCardTitleProps) {
-  return <Tag className="admin-card__title">{children}</Tag>;
+  const className = Tag === "h1" ? "title is-4" : "title is-5 admin-card__title";
+  return <Tag className={className}>{children}</Tag>;
 }

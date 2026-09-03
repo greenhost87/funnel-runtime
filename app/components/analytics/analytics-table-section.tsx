@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { AdminCardTitle } from "@/components/layout/admin-card-title";
 import { AnalyticsEmpty } from "@/components/layout/analytics/analytics-empty";
-import { AnalyticsTable } from "@/components/layout/analytics/analytics-table";
 import { AnalyticsTableWrap } from "@/components/layout/analytics/analytics-table-wrap";
+import { DtHeader, DtTable } from "@/components/ui/dt-table/dt-table";
 
 type AnalyticsTableSectionProps<TRow> = {
   title: string;
@@ -28,18 +28,12 @@ export function AnalyticsTableSection<TRow>({
   return (
     <AnalyticsTableWrap>
       <AdminCardTitle as="h2">{title}</AdminCardTitle>
-      <AnalyticsTable>
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th key={header}>{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{rows.map((row) => (
-          <tr key={rowKey(row)}>{renderRow(row)}</tr>
-        ))}</tbody>
-      </AnalyticsTable>
+      <DtTable>
+        <DtHeader columns={headers} />
+        {rows.map((row) => (
+          <div key={rowKey(row)}>{renderRow(row)}</div>
+        ))}
+      </DtTable>
     </AnalyticsTableWrap>
   );
 }

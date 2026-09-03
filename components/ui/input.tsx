@@ -30,20 +30,27 @@ type InputProps = {
   children?: ReactNode;
 };
 
-const variantClass: Record<InputVariant, string | undefined> = {
-  default: undefined,
-  form: "form-input",
-  file: "form-file",
-};
-
 function inputClassName(variant: InputVariant, className: string | undefined): string | undefined {
-  const classes = [variantClass[variant], className].filter(Boolean).join(" ");
-  return classes || undefined;
+  if (variant === "default") {
+    return className;
+  }
+
+  return ["input", variant === "file" ? "is-fullwidth" : "", className].filter(Boolean).join(" ");
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { variant = "default", className, ...props },
   ref,
 ) {
-  return <input ref={ref} className={inputClassName(variant, className)} {...props} />;
+  const resolvedClassName = inputClassName(variant, className);
+
+  if (variant === "form" || variant === "file") {
+    return (
+      <div className="control">
+        <input ref={ref} className={resolvedClassName} {...props} />
+      </div>
+    );
+  }
+
+  return <input ref={ref} className={resolvedClassName} {...props} />;
 });

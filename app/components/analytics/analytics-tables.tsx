@@ -5,6 +5,7 @@ import {
   AnalyticsTableSection,
   formatRate,
 } from "@/app/components/analytics/analytics-table-section";
+import { DtCell } from "@/components/ui/dt-table/dt-table";
 
 type ComparisonRow = {
   versionId: string;
@@ -25,12 +26,12 @@ export function ComparisonTable({ comparisons }: { comparisons: ComparisonRow[] 
       rowKey={(row) => `${row.versionId}:${row.variant}`}
       renderRow={(row) => (
         <>
-          <td>{row.versionId}</td>
-          <td>{row.variant}</td>
-          <td>{row.started}</td>
-          <td>{formatRate(row.primaryCtaFromStartConversion)}</td>
-          <td>{formatRate(row.resultReachRate)}</td>
-          <td>{formatRate(row.ctaCtr)}</td>
+          <DtCell label="Version">{row.versionId}</DtCell>
+          <DtCell label="Variant">{row.variant}</DtCell>
+          <DtCell label="Sessions started">{row.started}</DtCell>
+          <DtCell label="CTA from start">{formatRate(row.primaryCtaFromStartConversion)}</DtCell>
+          <DtCell label="Result reach">{formatRate(row.resultReachRate)}</DtCell>
+          <DtCell label="CTA CTR">{formatRate(row.ctaCtr)}</DtCell>
         </>
       )}
     />
@@ -47,14 +48,14 @@ export function EdgeTable({ edges }: { edges: EdgeMetric[] }) {
       rowKey={(edge) => `${edge.versionId}-${edge.variant}-${edge.fromStepId}-${edge.toStepId ?? "result"}`}
       renderRow={(edge) => (
         <>
-          <td>{edge.versionId.slice(0, 8)}…</td>
-          <td>{edge.variant}</td>
-          <td>{edge.fromStepId}</td>
-          <td>{edge.toResult ? "result" : edge.toStepId}</td>
-          <td>{edge.views}</td>
-          <td>{edge.completions}</td>
-          <td>{formatRate(edge.conversionRate)}</td>
-          <td>{formatRate(edge.dropOffRate)}</td>
+          <DtCell label="Version">{edge.versionId.slice(0, 8)}…</DtCell>
+          <DtCell label="Variant">{edge.variant}</DtCell>
+          <DtCell label="From">{edge.fromStepId}</DtCell>
+          <DtCell label="To">{edge.toResult ? "result" : edge.toStepId}</DtCell>
+          <DtCell label="Views">{edge.views}</DtCell>
+          <DtCell label="Completions">{edge.completions}</DtCell>
+          <DtCell label="Conversion">{formatRate(edge.conversionRate)}</DtCell>
+          <DtCell label="Drop-off">{formatRate(edge.dropOffRate)}</DtCell>
         </>
       )}
     />

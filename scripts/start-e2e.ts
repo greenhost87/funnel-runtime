@@ -3,11 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createEnv, getBooleanEnv, getPositiveIntegerEnv } from "@/system/config/environment";
+import { resolveE2ePort } from "@/system/net/e2e-server";
 
 const tempDir = mkdtempSync(join(tmpdir(), "funnel-e2e-"));
 const dbPath = join(tempDir, "e2e.sqlite");
 
-const port = getPositiveIntegerEnv("PORT") ?? 3000;
+const port = getPositiveIntegerEnv("PORT") ?? (await resolveE2ePort());
 const productionMode = getBooleanEnv("NODE_ENV_PRODUCTION", true);
 
 const env = createEnv({

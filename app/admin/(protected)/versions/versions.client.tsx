@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, type SyntheticEvent } from "react";
-import { SecondaryActionButton } from "@/components/ui/secondary-action-button";
 import { PrimarySubmitButton } from "@/components/ui/primary-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AdminCard, AdminHistoryItem } from "@/components/layout/class-tagged";
-import { AdminHistory } from "@/components/layout/admin/admin-history";
+import { AdminCard } from "@/components/layout/class-tagged";
+import { VersionsHistoryTable } from "@/app/components/versions/versions-history-table";
 import { AdminErrorList } from "@/components/layout/admin/admin-error-list";
 import { AdminCardTitle } from "@/components/layout/admin-card-title";
 import { AnalyticsEmpty } from "@/components/layout/analytics/analytics-empty";
@@ -142,28 +141,13 @@ export function VersionsClient({ initialActive, initialHistory }: Props) {
 
       <AdminCard>
         <AdminCardTitle as="h2">Activation history</AdminCardTitle>
-        <AdminHistory>
-          {history.map((item) => (
-            <AdminHistoryItem key={item.activationId} active={item.isActive}>
-              <div>
-                <strong>{item.configId}</strong>
-                <div>{item.versionId}</div>
-                <div>{item.activatedAt}</div>
-              </div>
-              {!item.isActive ? (
-                <SecondaryActionButton
-                  loading={loading}
-                  loadingLabel="Rolling back…"
-                  onClick={() => void onRollback(item.versionId)}
-                >
-                  Rollback
-                </SecondaryActionButton>
-              ) : (
-                <span>Active</span>
-              )}
-            </AdminHistoryItem>
-          ))}
-        </AdminHistory>
+        <VersionsHistoryTable
+          history={history}
+          loading={loading}
+          onRollback={(versionId) => {
+            void onRollback(versionId);
+          }}
+        />
       </AdminCard>
     </div>
   );

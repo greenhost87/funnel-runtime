@@ -1,57 +1,28 @@
-@use "surface-card";
-
 .admin-card {
-  @include surface-card.surface-card;
   margin-bottom: var(--space-5);
 }
 
 .admin-card__title {
-  font-size: var(--font-size-lg);
-  font-weight: 700;
   margin-bottom: var(--space-4);
 }
 
 .admin-login {
   max-width: 24rem;
   margin: var(--space-8) auto;
-  padding: var(--space-5);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
 }
 
-.admin-history {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.admin-history__item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.admin-history__item--active {
-  border-color: var(--color-success);
-  background: #f0fdf4;
+.versions-history__row--active > * {
+  background: var(--bulma-success-soft);
 }
 
 .admin-validation-errors {
   margin-top: var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: #fef2f2;
-  color: var(--color-error);
-  font-size: var(--font-size-sm);
 }
 
-.admin-validation-errors ul {
-  list-style: disc;
-  padding-left: var(--space-5);
+@media (max-width: 479px) {
+  .admin-login {
+    margin: var(--space-4) auto;
+    max-width: none;
+  }
+
 }

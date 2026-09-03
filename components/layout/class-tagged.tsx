@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { AdminCardProps, AdminHistoryItemProps, AnalyticsCardProps, FunnelConfigErrorProps, FunnelDescriptionProps, LayoutCardSurfaceProps } from "@/components/layout/html-props";
+import type { AdminCardProps, AnalyticsCardProps, FunnelConfigErrorProps, FunnelDescriptionProps, LayoutCardSurfaceProps } from "@/components/layout/html-props";
 
 type LayoutTagName = "section" | "div" | "p" | "span";
 
@@ -93,11 +93,10 @@ function createConditionalCard(baseClass: string, modifierClass: string) {
   };
 }
 
-const adminCardTagged = createClassTagged("admin-card", "section");
-const funnelConfigErrorTagged = createClassTagged("funnel__config-error", "p");
+const adminCardTagged = createClassTagged("box admin-card", "section");
+const funnelConfigErrorTagged = createClassTagged("notification is-danger funnel__config-error", "p");
 const funnelDescriptionTagged = createClassTagged("funnel__description", "p");
-const AdminHistoryItemView = createConditionalCard("admin-history__item", "admin-history__item--active");
-const AnalyticsCardView = createConditionalCard("analytics-card", "analytics-card--primary");
+const AnalyticsCardView = createConditionalCard("box analytics-card", "analytics-card--primary");
 
 export function AdminCard(props: AdminCardProps): ReactNode {
   return adminCardTagged(props);
@@ -109,10 +108,6 @@ export function FunnelConfigError(props: FunnelConfigErrorProps): ReactNode {
 
 export function FunnelDescription(props: FunnelDescriptionProps): ReactNode {
   return funnelDescriptionTagged(props);
-}
-
-export function AdminHistoryItem(props: AdminHistoryItemProps): ReactNode {
-  return <AdminHistoryItemView {...props} enabled={props.active} />;
 }
 
 export function AnalyticsCard(props: AnalyticsCardProps): ReactNode {

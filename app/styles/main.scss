@@ -1,17 +1,17 @@
+@use "bulma-config";
 @use "tokens";
-@use "reset";
 @use "layout";
-@use "elements/forms";
-@use "elements/buttons";
+@use "elements/dt";
 @use "components/funnel";
 @use "components/admin";
 @use "components/analytics";
 
+html {
+  color-scheme: light dark;
+}
+
 body {
-  margin: 0;
-  font-family: var(--font-family);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height);
-  color: var(--color-text);
-  background: var(--color-bg);
+  min-height: 100dvh;
+  background: var(--bulma-background);
+  color: var(--bulma-text);
 }

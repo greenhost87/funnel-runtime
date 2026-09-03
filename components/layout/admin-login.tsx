@@ -5,5 +5,9 @@ type AdminLoginProps = {
 };
 
 export function AdminLogin({ children }: AdminLoginProps) {
-  return <div className="admin-login">{children}</div>;
+  return (
+    <section className="section admin-login">
+      <div className="box">{children}</div>
+    </section>
+  );
 }

@@ -1,7 +1,7 @@
 import { forwardRef, type MouseEvent, type ReactNode } from "react";
 
 type ButtonProps = {
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "nav";
   cta?: boolean;
   className?: string;
   type?: "button" | "submit" | "reset";
@@ -12,19 +12,32 @@ type ButtonProps = {
   value?: string;
   form?: string;
   autoFocus?: boolean;
+  title?: string;
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   onFocus?: (event: React.FocusEvent<HTMLButtonElement>) => void;
   onBlur?: (event: React.FocusEvent<HTMLButtonElement>) => void;
   "aria-label"?: string;
   "aria-disabled"?: boolean;
+  "aria-expanded"?: boolean;
 };
 
 function buttonClassName(
-  variant: "primary" | "secondary",
+  variant: "primary" | "secondary" | "nav",
   cta: boolean | undefined,
   className: string | undefined,
 ): string {
-  return ["btn", `btn--${variant}`, cta ? "btn--cta" : "", className].filter(Boolean).join(" ");
+  if (variant === "nav") {
+    return className ?? "";
+  }
+
+  return [
+    "button",
+    variant === "primary" ? "is-primary" : "",
+    cta ? "is-fullwidth is-medium" : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(

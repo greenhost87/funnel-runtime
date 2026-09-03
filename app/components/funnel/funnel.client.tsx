@@ -6,7 +6,7 @@ import { FunnelConfigError, FunnelDescription } from "@/components/layout/class-
 import { FunnelHeader } from "@/components/layout/funnel/funnel-header";
 import { FunnelLoading } from "@/components/layout/funnel/funnel-loading";
 import { FunnelTitle } from "@/components/layout/funnel/funnel-title";
-import { FunnelScreenControls } from "@/app/components/funnel/funnel-controls";
+import { FunnelScreenControls } from "@/components/layout/funnel/funnel-screen-controls";
 import { FunnelStepProgress } from "@/app/components/funnel/funnel-progress";
 import { ResultScreen } from "@/app/components/funnel/result-screen";
 import { ScreenRenderer } from "@/app/components/funnel/screen-renderer";

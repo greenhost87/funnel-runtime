@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Label } from "@/components/ui/label";
 import { Option } from "@/components/ui/option";
 import { Select } from "@/components/ui/select";
 import { AdminCardTitle } from "@/components/layout/admin-card-title";
 import { AnalyticsFilters } from "@/components/layout/analytics/analytics-filters";
-import { FormField } from "@/components/layout/form-field";
 import { AnalyticsDashboardSchema } from "@/system/analytics/analytics.schema";
 import type { AnalyticsDashboard } from "@/system/analytics/analytics.service";
 import { parseJsonFromReadable } from "@/system/http/json";
@@ -33,21 +31,21 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
     <div>
       <AdminCardTitle>Analytics dashboard</AdminCardTitle>
       <AnalyticsFilters>
-        <FormField>
-          <Label htmlFor="campaign">UTM campaign</Label>
-          <Select
-            id="campaign"
-            value={campaign}
-            onChange={(event) => void applyFilter(event.target.value)}
-          >
-            <Option value="">All campaigns</Option>
-            {data.campaigns.map((item) => (
-              <Option key={item} value={item}>
-                {item}
-              </Option>
-            ))}
-          </Select>
-        </FormField>
+        <Select
+          id="campaign"
+          label="UTM campaign"
+          value={campaign}
+          onChange={(event) => {
+            void applyFilter(event.target.value);
+          }}
+        >
+          <Option value="">All campaigns</Option>
+          {data.campaigns.map((item) => (
+            <Option key={item} value={item}>
+              {item}
+            </Option>
+          ))}
+        </Select>
       </AnalyticsFilters>
       <SummaryCards summary={data.summary} />
       <EdgeTable edges={data.edges} />

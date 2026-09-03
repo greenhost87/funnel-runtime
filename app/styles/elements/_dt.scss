@@ -1,0 +1,67 @@
+/************* ULTRA LIGHT TABLE (WITH BORDERS) DESIGN *************/
+.dt {
+  display: table;
+  width: 100%;
+  font-size: small;
+
+  > * {
+    display: table-row;
+  }
+
+  > :nth-child(2n) {
+    background-color: var(--bulma-background);
+  }
+
+  > :hover {
+    background-color: var(--bulma-border-weak);
+  }
+
+  > * > * {
+    border-bottom: 1px solid var(--bulma-border);
+    display: table-cell;
+    padding: 0.25em 0.5em;
+    vertical-align: middle;
+  }
+
+  > :first-child {
+    font-weight: bold;
+  }
+
+  a {
+    color: var(--bulma-link);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+}
+
+@media screen and (min-width: 600px) {
+  .dt > :last-child > * {
+    border-bottom: 0;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .dt > :first-child {
+    display: none;
+  }
+
+  .dt > * > * {
+    text-align: right;
+    display: block;
+  }
+
+  .dt > * > *::before {
+    content: attr(data-label);
+    float: left;
+    font-weight: bold;
+  }
+
+  .dt > * > *:last-child {
+    border-bottom: 0;
+    margin-bottom: 0.625em;
+  }
+}
+
+.dt-footer > * {
+  font-weight: bold;
+}

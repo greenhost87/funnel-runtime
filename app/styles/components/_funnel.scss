@@ -12,13 +12,11 @@
 }
 
 .funnel__title {
-  font-size: var(--font-size-xl);
-  font-weight: 700;
   word-wrap: break-word;
 }
 
 .funnel__description {
-  color: var(--color-text-muted);
+  color: var(--bulma-text-weak);
   word-wrap: break-word;
 }
 
@@ -30,20 +28,20 @@
 
 .funnel__progress-bar {
   height: 0.5rem;
-  background: var(--color-border);
+  background: var(--bulma-border);
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
 .funnel__progress-fill {
   height: 100%;
-  background: var(--color-primary);
+  background: var(--bulma-primary);
   transition: width 0.2s ease;
 }
 
 .funnel__progress-label {
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: var(--bulma-text-weak);
 }
 
 .funnel__options {
@@ -57,27 +55,35 @@
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--bulma-border);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
+  background: var(--bulma-scheme-main);
   cursor: pointer;
   word-wrap: break-word;
 }
 
 .funnel__option:hover {
-  border-color: var(--color-primary);
+  border-color: var(--bulma-primary);
 }
 
 .funnel__option--selected {
-  border-color: var(--color-primary);
-  background: #eff6ff;
+  border-color: var(--bulma-primary);
+  background: var(--bulma-primary-soft);
 }
 
 .funnel__controls {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-3);
   margin-top: var(--space-2);
+}
+
+.funnel__control-button {
+  width: 100%;
+}
+
+.funnel__control-spacer {
+  display: block;
 }
 
 .funnel__result {
@@ -86,35 +92,13 @@
   gap: var(--space-5);
 }
 
-.funnel__result-title {
-  font-size: var(--font-size-xl);
-  font-weight: 700;
-}
-
 .funnel__result-body {
-  color: var(--color-text-muted);
+  color: var(--bulma-text-weak);
   word-wrap: break-word;
 }
 
-.funnel__config-error {
-  padding: var(--space-4);
-  border: 1px solid var(--color-error);
-  border-radius: var(--radius-md);
-  color: var(--color-error);
-  background: #fef2f2;
-}
-
 .funnel__loading {
-  color: var(--color-text-muted);
+  color: var(--bulma-text-weak);
   padding: var(--space-6) 0;
 }
 
-@media (max-width: 320px) {
-  .funnel__controls {
-    flex-direction: column;
-  }
-
-  .funnel__controls .btn {
-    width: 100%;
-  }
-}

@@ -44,13 +44,6 @@ export interface LayoutMainProps {
   title?: string;
 }
 
-export interface LayoutTableProps {
-  children: ReactNode;
-  id?: string;
-  role?: string;
-  "aria-label"?: string;
-}
-
 export interface FunnelProgressFillProps {
   percent: number;
   id?: string;
@@ -93,10 +86,6 @@ export interface LayoutCardSurfaceProps {
   tabIndex?: number;
   onClick?: (event: MouseEvent<HTMLDivElement>) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
-}
-
-export interface AdminHistoryItemProps extends LayoutCardSurfaceProps {
-  active?: boolean;
 }
 
 export interface AnalyticsCardProps {

@@ -1,10 +1,10 @@
 "use client";
 
-import { SecondaryActionButton } from "@/components/ui/secondary-action-button";
 import { Button } from "@/components/ui/button";
+import { FunnelControlSpacer } from "@/components/layout/funnel/funnel-control-spacer";
 import { FunnelControls as FunnelControlsRoot } from "@/components/layout/funnel/funnel-controls";
 
-type FunnelControlsProps = {
+type FunnelScreenControlsProps = {
   showBack: boolean;
   nextLabel?: string;
   onBack: () => void;
@@ -18,15 +18,23 @@ export function FunnelScreenControls({
   onBack,
   onNext,
   nextDisabled,
-}: FunnelControlsProps) {
+}: FunnelScreenControlsProps) {
   return (
     <FunnelControlsRoot>
       {showBack ? (
-        <SecondaryActionButton onClick={onBack}>
+        <Button variant="secondary" type="button" className="funnel__control-button" onClick={onBack}>
           Back
-        </SecondaryActionButton>
-      ) : null}
-      <Button variant="primary" type="button" onClick={onNext} disabled={nextDisabled}>
+        </Button>
+      ) : (
+        <FunnelControlSpacer />
+      )}
+      <Button
+        variant="primary"
+        type="button"
+        className="funnel__control-button"
+        onClick={onNext}
+        disabled={nextDisabled}
+      >
         {nextLabel}
       </Button>
     </FunnelControlsRoot>

@@ -5,5 +5,5 @@ type FormFieldProps = {
 };
 
 export function FormField({ children }: FormFieldProps) {
-  return <div className="form-field">{children}</div>;
+  return <div className="field">{children}</div>;
 }
