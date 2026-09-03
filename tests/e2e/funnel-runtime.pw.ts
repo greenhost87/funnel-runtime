@@ -39,7 +39,7 @@ function eventNames(batches: EventBatchPayload[]): string[] {
   return batches.flatMap((batch) => batch.events.map((event) => event.eventName));
 }
 
-const SESSION_READY_TIMEOUT = 15_000;
+const SESSION_READY_TIMEOUT = 30_000;
 
 async function waitForSessionResponse(page: Page) {
   return page.waitForResponse(

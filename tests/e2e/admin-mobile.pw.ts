@@ -51,6 +51,7 @@ test.describe("admin mobile layout at 320px", () => {
     await adminLogin(page);
     await page.goto("/admin/traffic");
     await expect(page.locator("#date")).toHaveValue(/\d{4}-\d{2}-\d{2}/);
+    await page.locator("#sessionPreset").selectOption("100");
     await page.getByRole("button", { name: "Generate traffic" }).click();
     await expect(
       page.getByText(/Generated \d+ synthetic sessions for \d{4}-\d{2}-\d{2}\./),
