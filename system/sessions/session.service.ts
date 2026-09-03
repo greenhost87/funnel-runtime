@@ -31,6 +31,7 @@ export type SessionSnapshot = {
 
 type CreateSessionOptions = {
   variantOverride?: FunnelVariant;
+  versionId?: string;
   utm?: UtmParams;
 };
 
@@ -86,12 +87,13 @@ export function createSessionService(db: Database) {
   }
 
   function createNew(options: CreateSessionOptions): SessionSnapshot {
-    const active = versions.getActive();
-    if (!active) {
-      throw new Error("No active funnel version");
+    const versionId = options.versionId ?? versions.getActive()?.versionId;
+    if (!versionId) {
+      throw new Error("No funnel version available for session");
     }
+    const config = versions.getConfigByVersionId(versionId);
     const variant = options.variantOverride ?? assignVariant();
-    const effective = resolveEffectiveConfig(active.config, variant);
+    const effective = resolveEffectiveConfig(config, variant);
     const initial = createInitialState(effective);
     const eventId = randomUUIDv7();
     const currentStepId = initial.currentStepId;
@@ -99,7 +101,7 @@ export function createSessionService(db: Database) {
       throw new Error("Initial funnel state has no current step");
     }
     const row = sessions.createSession({
-      versionId: active.versionId,
+      versionId,
       variant,
       utm: options.utm ?? {},
       sessionStartedEventId: eventId,

@@ -2,7 +2,7 @@
 
 import { useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { PrimarySubmitButton } from "@/components/ui/primary-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdminCardTitle } from "@/components/layout/admin-card-title";
@@ -59,9 +59,9 @@ export default function AdminLoginPage() {
             />
           </FormField>
           {error ? <FormError>{error}</FormError> : null}
-          <Button variant="primary" type="submit" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
-          </Button>
+          <PrimarySubmitButton loading={loading} loadingLabel="Signing in…">
+            Sign in
+          </PrimarySubmitButton>
         </form>
       </AdminLogin>
     </PageShell>

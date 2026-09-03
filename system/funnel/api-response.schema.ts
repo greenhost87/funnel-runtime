@@ -93,3 +93,12 @@ export const RollbackRequestSchema = v.object({
 export const LoginRequestSchema = v.object({
   password: v.string(),
 });
+
+export const TrafficGenerateRequestSchema = v.object({
+  versionId: v.string(),
+  sessions: v.optional(v.pipe(v.number(), v.integer(), v.minValue(100))),
+});
+
+export const TrafficGenerateResponseSchema = v.object({
+  generatedSessions: v.number(),
+});

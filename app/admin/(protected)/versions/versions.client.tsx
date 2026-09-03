@@ -2,19 +2,17 @@
 
 import { useState, type SyntheticEvent } from "react";
 import { SecondaryActionButton } from "@/components/ui/secondary-action-button";
-import { Button } from "@/components/ui/button";
+import { PrimarySubmitButton } from "@/components/ui/primary-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdminCard, AdminHistoryItem } from "@/components/layout/class-tagged";
 import { AdminHistory } from "@/components/layout/admin/admin-history";
-import { AdminValidationErrors } from "@/components/layout/admin/admin-validation-errors";
+import { AdminErrorList } from "@/components/layout/admin/admin-error-list";
 import { AdminCardTitle } from "@/components/layout/admin-card-title";
 import { AnalyticsEmpty } from "@/components/layout/analytics/analytics-empty";
 import { FormField } from "@/components/layout/form-field";
-import {
-  ErrorResponseSchema,
-  VersionsListResponseSchema,
-} from "@/system/funnel/api-response.schema";
+import { readAdminErrors } from "@/app/admin/admin-api";
+import { VersionsListResponseSchema } from "@/system/funnel/api-response.schema";
 import type { ActiveVersionSnapshot } from "@/system/versions/version.service";
 import { parseJsonFromReadable } from "@/system/http/json";
 
@@ -26,18 +24,6 @@ type HistoryItem = {
   isActive: boolean;
 };
 
-function renderValidationErrors(errors: readonly string[]) {
-  return (
-    <AdminValidationErrors>
-      <ul>
-        {errors.map((error) => (
-          <li key={error}>{error}</li>
-        ))}
-      </ul>
-    </AdminValidationErrors>
-  );
-}
-
 type Props = {
   initialActive: ActiveVersionSnapshot | null;
   initialHistory: HistoryItem[];
@@ -46,11 +32,6 @@ type Props = {
 async function loadVersionsState() {
   const response = await fetch("/api/admin/versions");
   return parseJsonFromReadable(response, VersionsListResponseSchema);
-}
-
-async function readAdminErrors(response: Response): Promise<string[]> {
-  const payload = await parseJsonFromReadable(response, ErrorResponseSchema);
-  return payload.details && payload.details.length > 0 ? payload.details : [payload.error];
 }
 
 async function refreshVersionsState(
@@ -154,11 +135,9 @@ export function VersionsClient({ initialActive, initialHistory }: Props) {
               required
             />
           </FormField>
-          <Button variant="primary" type="submit" disabled={loading}>
-            Publish
-          </Button>
+          <PrimarySubmitButton loading={loading}>Publish</PrimarySubmitButton>
         </form>
-        {errors.length > 0 ? renderValidationErrors(errors) : null}
+        {errors.length > 0 ? <AdminErrorList errors={errors} /> : null}
       </AdminCard>
 
       <AdminCard>

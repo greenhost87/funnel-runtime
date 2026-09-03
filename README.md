@@ -17,10 +17,11 @@ cp .env.example .env
 bun install
 bun run migrate
 bun run seed
+bun run generate:traffic
 bun run dev
 ```
 
-Open `http://localhost:3000` for the funnel and `/admin/login` for admin (password from `ADMIN_PASSWORD`).
+Open `http://localhost:3000` for the funnel and `/admin/login` for admin (password from `ADMIN_PASSWORD`). After `generate:traffic`, the admin dashboard shows synthetic sessions with UTM splits, A/B variants, drop-offs, and duplicate/out-of-order events.
 
 ## Environment
 
@@ -43,7 +44,7 @@ Open `http://localhost:3000` for the funnel and `/admin/login` for admin (passwo
 | `bun run seed`                                         | Idempotent initial config publish   |
 | `bun test`                                             | Unit/integration tests (`bun:test`) |
 | `bun run test:e2e`                                     | Playwright browser tests            |
-| `bun run generate:traffic -- --seed 42 --sessions 120` | Synthetic traffic generator         |
+| `bun run generate:traffic -- --seed 42 --sessions 120` | Populate `SQLITE_PATH` with synthetic sessions for the admin dashboard |
 
 ## Data model
 

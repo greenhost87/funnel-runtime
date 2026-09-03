@@ -26,6 +26,7 @@ export function AdminShellNav() {
     <AdminNavRoot>
       <Link href="/admin/versions">Versions</Link>
       <Link href="/admin/analytics">Analytics</Link>
+      <Link href="/admin/traffic">Traffic</Link>
       <AdminLogoutButton />
     </AdminNavRoot>
   );
