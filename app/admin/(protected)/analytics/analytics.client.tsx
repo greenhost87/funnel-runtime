@@ -7,6 +7,7 @@ import { Option } from "@/components/ui/primitives";
 import { Select } from "@/components/ui/select";
 import { AdminCardTitle, FormField } from "@/components/layout/primitives";
 import { AnalyticsFilters } from "@/components/layout/analytics-primitives";
+import { withBasePath } from "@/system/config/base-path";
 import { AnalyticsDashboardSchema } from "@/system/analytics/analytics.schema";
 import type { AnalyticsDashboard } from "@/system/analytics/analytics.service";
 import { parseJsonFromReadable } from "@/system/http/json";
@@ -64,7 +65,9 @@ type AnalyticsFilterHandlers = {
 async function applyAnalyticsFilters(nextFilters: FilterState, handlers: AnalyticsFilterHandlers) {
   handlers.setFilters(nextFilters);
   handlers.setLoading(true);
-  const response = await fetch(`/api/admin/analytics${buildAnalyticsQuery(nextFilters)}`);
+  const response = await fetch(
+    withBasePath(`/api/admin/analytics${buildAnalyticsQuery(nextFilters)}`),
+  );
   const payload = await parseJsonFromReadable(response, AnalyticsDashboardSchema);
   handlers.setData(payload);
   handlers.setLoading(false);

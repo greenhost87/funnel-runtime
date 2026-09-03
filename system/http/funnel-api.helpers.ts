@@ -1,5 +1,6 @@
 import type { NextResponse } from "next/server";
 import type { Database } from "bun:sqlite";
+import { getCookiePath } from "@/system/config/base-path";
 import { isNodeEnvironment } from "@/system/config/environment";
 import { advanceInfo, goBack, restoreState, submitAnswer } from "@/system/funnel/funnel-engine";
 import type { AdvanceResult } from "@/system/funnel/funnel-engine";
@@ -18,13 +19,15 @@ import { cookies } from "next/headers";
 
 const SESSION_COOKIE_NAME = "funnel_session_id";
 
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  secure: isNodeEnvironment("production"),
-  path: "/",
-  maxAge: 60 * 60 * 24 * 30,
-};
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: isNodeEnvironment("production"),
+    path: getCookiePath(),
+    maxAge: 60 * 60 * 24 * 30,
+  };
+}
 
 export function getServices(db: Database) {
   return {
@@ -40,7 +43,7 @@ export async function getSessionIdFromCookie(): Promise<string | undefined> {
 }
 
 export function setSessionCookie(response: NextResponse, sessionId: string): void {
-  response.cookies.set(SESSION_COOKIE_NAME, sessionId, COOKIE_OPTIONS);
+  response.cookies.set(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions());
 }
 
 export function buildApiState(db: Database, snapshot: SessionSnapshot): FunnelApiState {

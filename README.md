@@ -1,115 +1,131 @@
 # Funnel Runtime
 
-Bun-first fullstack platform for configurable multi-step web funnels with versioning, A/B experiments, event batching, analytics, and rollback.
-
-## Decisions (D1–D3)
-
-**D1 — Bun-first runtime.** Install, scripts, runtime, and SQLite use Bun and `bun:sqlite`. This is an intentional deviation from the original Node.js wording in the assignment brief.
-
-**D2 — Deployment out of scope.** Public URL and persistent production storage remain **TBD** until a separate deployment decision. CI verifies build and tests only.
-
-**D3 — Synthetic fixtures.** Missing source JSON configs are replaced by repository fixtures under `fixtures/funnels/`. Variant B tests lower-friction copy, earlier low-friction questions, reordered steps, and a benefit-oriented result. **Primary metric:** `unique sessions with cta_clicked / unique sessions with session_started`.
+Fullstack TypeScript runtime for configurable multi-step funnels, pinned configuration versions, A/B experiments, batched events, analytics, synthetic traffic, and rollback. The application uses Next.js, React, Bun, and SQLite without external services.
 
 ## Local setup
 
+Requirements: Bun 1.4.0 and a Chromium installation for Playwright.
+
 ```bash
 cp .env.example .env
-bun install
+bun install --frozen-lockfile
 bun run migrate
-bun run seed
-bun run generate:traffic
 bun run dev
 ```
 
-Open `http://localhost:3000` for the funnel and `/admin/login` for admin (password from `ADMIN_PASSWORD`). After `generate:traffic`, the admin dashboard shows synthetic sessions with UTM splits, A/B variants, drop-offs, and duplicate/out-of-order events.
+Open `http://localhost:3000` for the funnel and `http://localhost:3000/admin/login` for administration. Migration `0002_seed_initial_funnel.sql` publishes the initial funnel in an empty database.
 
 ## Environment
 
-| Variable               | Purpose                              |
-| ---------------------- | ------------------------------------ |
-| `SQLITE_PATH`          | SQLite database file path            |
-| `APP_URL`              | Public app URL for links             |
-| `ADMIN_PASSWORD`       | Local admin login password           |
-| `ADMIN_SIGNING_SECRET` | HMAC secret for admin session cookie |
+| Variable               | Purpose                                                                     |
+| ---------------------- | --------------------------------------------------------------------------- |
+| `SQLITE_PATH`          | Persistent SQLite file; defaults to `data/app.sqlite`                       |
+| `APP_URL`              | External application URL                                                    |
+| `ADMIN_PASSWORD`       | Password for the internal pages                                             |
+| `ADMIN_SIGNING_SECRET` | HMAC secret for the admin session cookie                                    |
+| `BASE_PATH`            | Optional URL prefix for production deployment and server-side path helpers |
+| `NEXT_PUBLIC_BASE_PATH`| Optional client-side URL prefix; falls back to `BASE_PATH` when unset       |
+| `LOG_LEVEL`            | Optional production log verbosity; see `.github/workflows/scripts/production.env.example`      |
+| `DATA_RETENTION_*`     | Optional production retention schedule; see `.github/workflows/scripts/production.env.example` |
 
 ## Commands
 
-| Command                                                                 | Purpose                                                                                                                                                                                                                                                                                     |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run dev`                                                           | Development server                                                                                                                                                                                                                                                                          |
-| `bun run build`                                                         | Production build                                                                                                                                                                                                                                                                            |
-| `bun run typecheck`                                                     | TypeScript check                                                                                                                                                                                                                                                                            |
-| `bun run fmt` / `fmt:check`                                             | Format with oxfmt                                                                                                                                                                                                                                                                           |
-| `bun run migrate`                                                       | Apply SQL migrations                                                                                                                                                                                                                                                                        |
-| `bun run seed`                                                          | Idempotent initial config publish                                                                                                                                                                                                                                                           |
-| `bun test`                                                              | Unit/integration tests (`bun:test`)                                                                                                                                                                                                                                                         |
-| `bun run test:e2e`                                                      | Playwright browser tests                                                                                                                                                                                                                                                                    |
-| `bun run generate:traffic -- --seed 42 --sessions 120`                  | Populate `SQLITE_PATH` with synthetic sessions for the admin dashboard. Supports `--versionId <id>` to target a specific version and `--withAlternative` to publish `alternative` alongside the active version; without flags all sessions go to the active version (avoids version sprawl) |
-| `bun run generate:traffic -- --versionId <id> --seed 42 --sessions 120` | Generate traffic for a pinned version (used by tests)                                                                                                                                                                                                                                       |
+| Command                                                                                    | Purpose                                                   |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `bun run dev`                                                                              | Development server                                        |
+| `bun run build`                                                                            | Production build                                          |
+| `bun run start`                                                                            | Production server                                         |
+| `bun run typecheck`                                                                        | Generate Next route types and run TypeScript              |
+| `bun run fmt`                                                                              | Format the repository                                     |
+| `bun run fmt:check`                                                                        | Check formatting                                          |
+| `bun run migrate`                                                                          | Apply immutable SQL migrations and seed an empty database |
+| `bun test`                                                                                 | Unit and integration tests                                |
+| `bun run test:e2e`                                                                         | Playwright tests against an isolated production build     |
+| `bun run generate:traffic -- --sessions 120 --seed 42`                                     | Generate deterministic traffic for the active version     |
+| `bun run generate:traffic -- --version-id <id> --sessions 120 --seed 42 --date 2026-09-01` | Generate traffic for a selected version and event date    |
 
-## Data model
+The generator requires at least 100 sessions. It creates both variants, several UTM campaigns and branches, drop-offs, Back/repeated views with different IDs, duplicate batch delivery, and reversed event delivery. It prints the resulting summary so the dashboard can be checked against the generated database.
 
-SQLite tables (see `migrations/0001_initial.sql`):
+## Configuration model
 
-- `funnel_versions` — immutable published JSON snapshots
-- `funnel_activation_history` — activation/rollback ledger; active = latest row
-- `sessions` — pinned version/variant, answers, step state, durable `session_started` pending/recorded
-- `session_transitions` — immutable forward transitions with `transition_id`
-- `events` — idempotent analytics facts keyed by `event_id`
+`system/funnel/config.schema.ts` validates JSON before publication. A config contains:
 
-## Config schema
+- at least six base steps;
+- at least one conditional transition (`when`);
+- `single-select`, `multi-select`, `number`, and `info` step types;
+- answer constraints and conditional transitions;
+- a result screen and primary CTA;
+- variant A/B overrides for text, exact step order, excluded steps, and result content;
+- optional version-scoped custom event names.
 
-Funnel JSON is validated by Valibot in `system/funnel/config.schema.ts`:
+When `stepOrder` is present, it defines the effective default sequence. Conditional transitions whose targets remain in the effective variant are preserved; transitions to omitted steps are removed and use the ordered default path. Publication rejects empty or duplicate variant orders and dangling effective transitions.
 
-- Step types: `single-select`, `multi-select`, `number`, `info`
-- Conditional transitions, result/CTA, variant overrides (order, exclusions, text, result)
-- Optional config-declared custom events
+The frontend renders the effective backend config and contains no funnel-specific screens. The backend validates every mutation and persists answers, current step, history, and progress.
 
-Fixtures:
+## Data model and versions
 
-- `fixtures/funnels/initial.json` — first iteration with A/B
-- `fixtures/funnels/alternative.json` — alternate publish target
-- `fixtures/funnels/iteration-2.json` — second iteration (branch, B screen removal, new event)
+SQLite migrations are in `migrations/`:
 
-## Event schema
+- `funnel_versions`: immutable JSON snapshots;
+- `funnel_activation_history`: append-only publication and rollback ledger; the latest row is active;
+- `sessions`: pinned version, pinned A/B variant, initial UTM values, answers, current state, history, and the durable `session_started` event ID;
+- `session_transitions`: immutable forward transitions used to validate completion facts;
+- `events`: analytics facts keyed by unique `event_id` and enriched with trusted session attribution.
 
-Batch endpoint: `POST /api/events` with `{ events: [...] }`.
+Publishing creates a new immutable version and activation in one transaction. Rollback appends an activation for an existing version and never deletes versions, sessions, or events. Existing cookies restore their pinned version and variant after refresh, publication, or rollback; only new sessions use the current active version. `?variant=A` and `?variant=B` override assignment only when a new session is created.
 
-Required events: `session_started`, `step_viewed`, `answer_submitted`, `step_completed`, `back_clicked`, `result_viewed`, `cta_clicked`.
+## Event schema and idempotency
 
-Each stored event includes server/client timestamps, pinned version/variant, nullable `step_id`, UTM fields, safe properties. `step_completed` must reference an immutable `transition_id`. Raw answers are rejected from event payloads.
+`POST /api/events` accepts `{ "events": [...] }`. Standard events are:
 
-Idempotency: duplicate `event_id` returns `duplicate` without double-counting. Partial batch acceptance is supported.
+- `session_started`;
+- `step_viewed`;
+- `answer_submitted`;
+- `step_completed`;
+- `back_clicked`;
+- `result_viewed`;
+- `cta_clicked`.
 
-## Aggregation rules
+Each item supplies `eventId`, `eventName`, `sessionId`, `clientTimestamp`, optional `stepId`, optional `transitionId`, and safe event properties. The server adds server timestamp, pinned version/variant, and UTM values. `step_completed` must reference the transition created by the corresponding state mutation. Raw answer keys are rejected recursively.
 
-Analytics uses **distinct session IDs** and trusted transition-linked completions:
+Every item is parsed and processed independently. A malformed neighbor does not prevent valid items from being accepted. Reusing an accepted `eventId` returns `duplicate`, including retries of `step_completed`, and creates no additional fact. Browser intents survive uncertain delivery in `sessionStorage`, are retried with their original IDs, and are replayed on the next page load if both immediate attempts fail.
 
-- Started = unique `session_started`
-- Primary metric (D3) = unique `cta_clicked` / unique `session_started`
-- Edge conversion = unique completions per immutable `from_step_id` → `to_step_id`/result
-- Drop-off = viewed step without completion for that step
-- Step funnel = breakdown by `versionId:variant:stepId` (see `system/analytics/analytics.service.ts#buildStepFunnel`), not a cross-version aggregate; `comparisons` and `edges` already provide per-version/variant views
-- Repeats, Back (`back_clicked` + distinct `step_viewed` with new `eventId`), duplicate IDs, and out-of-order timestamps do not inflate unique counts (`COUNT(DISTINCT session_id)`)
+Custom events are scoped to the pinned config. The seeded v1 config accepts `benefit_highlight_viewed`; `fixtures/funnels/iteration-2.json` adds `premium_interest_signal` for `wellness-quiz-v2` while keeping `benefit_highlight_viewed`. Sending a custom event outside the pinned config is rejected without affecting that session.
 
-## A/B hypothesis
+## Analytics rules
 
-**Hypothesis (variant B):** Shorter copy, earlier low-friction questions, and reordered steps reduce friction and increase primary CTA-from-start conversion vs variant A.
+All user counts use distinct session IDs rather than event counts:
 
-## Timeline
+- started: unique sessions with `session_started`;
+- primary conversion: unique sessions with `cta_clicked` divided by started sessions;
+- result reach: unique sessions with `result_viewed` divided by started sessions;
+- CTA CTR: unique sessions with `cta_clicked` divided by sessions that viewed the result;
+- edge conversion: unique sessions completing a concrete transition divided by unique sessions viewing its source step;
+- step drop-off: viewed sessions without any completion from that source step.
 
-1. **First iteration:** Core runtime — dynamic funnel, versioning, events, analytics, admin, tests.
-2. **Second iteration:** Publish `iteration-2.json` via admin (conditional branch, B screen removal, `premium_interest_signal` event) without SQLite schema changes; verify old sessions stay pinned; rollback preserves analytics.
+Metrics are grouped by pinned version and variant. Filters support UTM campaign, version, variant, and client event date. Distinct aggregation and immutable transition facts prevent duplicate IDs, repeated views, Back navigation, and out-of-order arrival from inflating totals. Empty denominators produce no rate instead of division by zero.
 
-**Version-scoped custom events:** `premium_interest_signal` (and `benefit_highlight_viewed`) are declared only in `fixtures/funnels/iteration-2.json` (`wellness-quiz-v2`). Sessions pinned to `wellness-quiz-v1` continue to work without error, but reporting `premium_interest_signal` from a `v1`-pinned `sessionId` is `rejected` as `Event not declared in pinned version <versionId>`; the event is accepted only on `wellness-quiz-v2` sessions.
+## A/B hypothesis and interpretation
+
+**Hypothesis:** variant B's shorter copy, low-friction ordered sequence, and concise result reduce abandonment and increase CTA-from-start conversion relative to variant A.
+
+**Primary metric:** `unique sessions with cta_clicked / unique sessions with session_started` for each variant within the same version, date range, and campaign mix.
+
+Result reach and per-step drop-off are diagnostic metrics. CTA CTR separates result-screen effectiveness from upstream funnel friction. A higher raw rate is not evidence of a winner by itself: compare equivalent traffic slices and wait for an adequate sample before drawing a statistical conclusion.
+
+## Iteration timeline
+
+1. First iteration: dynamic funnel, server-persisted state, immutable versions, A/B assignment, events, analytics, admin pages, traffic generation, and automated tests.
+2. Second iteration: `fixtures/funnels/iteration-2.json` adds the premium branch and `premium_interest_signal`, removes steps from variant B, publishes through the same admin API without a schema change, verifies old/new session compatibility, and rolls back while retaining analytics.
+
+## Deployment
+
+`.github/workflows/ci.yml` checks frozen installation, formatting, types, tests, build, and Playwright. `.github/workflows/deploy.yml` builds an archive and deploys it to a configured host. `.github/workflows/scripts/run-archive.sh` applies migrations, swaps releases, checks `/api/health`, and restores the previous release if deployment fails. SQLite remains outside the release directory.
 
 ## Known limitations
 
-- Public URL: **TBD** (D2)
-- Production persistent storage: **TBD** (D2)
-- Admin auth is local password + signed cookie only
-- Visual config editor is intentionally out of scope
-
-## CI
-
-GitHub Actions (`.github/workflows/ci.yml`): frozen install, format check, typecheck, `bun test`, production build, Playwright. No deploy job.
+- Bun is the server runtime, an intentional deviation from the assignment's literal Node.js wording.
+- SQLite and the process-local connection model target a single application instance.
+- Admin authentication is a shared password with a signed, expiring HTTP-only cookie.
+- The visual config editor is intentionally out of scope.
+- Runtime retention can delete old session analytics when explicitly enabled in production.

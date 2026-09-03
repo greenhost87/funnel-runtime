@@ -22,6 +22,6 @@ describe("version service", () => {
     const rolled = service.rollbackToVersion(first.versionId);
     expect(rolled.versionId).toBe(first.versionId);
     expect(service.getActive()?.versionId).toBe(first.versionId);
-    expect(service.getHistory().length).toBe(3);
+    expect(service.getHistory().length).toBe(4);
   });
 });

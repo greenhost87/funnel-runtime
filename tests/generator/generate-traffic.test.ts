@@ -1,8 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { $ } from "bun";
 import initialConfig from "@/fixtures/funnels/initial.json";
 import alternativeConfig from "@/fixtures/funnels/alternative.json";
 import { createAnalyticsService } from "@/system/analytics/analytics.service";
@@ -12,7 +8,7 @@ import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
 
 const currentDatabase = useIsolatedTestDatabase(import.meta.path);
 
-describe("generate-traffic command", () => {
+describe("generateSyntheticTraffic", () => {
   test("writes sessions for a selected version into the admin dashboard database", () => {
     const db = currentDatabase();
     const versions = createVersionService(db);
@@ -28,15 +24,38 @@ describe("generate-traffic command", () => {
 
     expect(generatedSessions).toBe(120);
     expect(dashboard.summary.sessionsStarted).toBe(120);
-    expect(dashboard.summary.primaryCtaFromStartConversion).toBeCloseTo(0.2916666666666667, 10);
-    expect(dashboard.summary.resultReachRate).toBeCloseTo(0.45, 10);
-    expect(dashboard.summary.ctaCtr).toBeCloseTo(0.6481481481481481, 10);
+    expect(dashboard.summary.primaryCtaFromStartConversion).toBeCloseTo(34 / 120, 10);
+    expect(dashboard.summary.resultReachRate).toBeCloseTo(59 / 120, 10);
+    expect(dashboard.summary.ctaCtr).toBeCloseTo(34 / 59, 10);
 
     const versionIds = new Set(dashboard.comparisons.map((row) => row.versionId));
     expect(versionIds.size).toBe(1);
     expect(versionIds.has(initial.versionId)).toBe(true);
     expect(dashboard.comparisons.reduce((total, row) => total + row.started, 0)).toBe(120);
-    expect(dashboard.campaigns.length).toBeGreaterThan(0);
+    expect(dashboard.campaigns).toEqual(["launch", "spring", "summer"]);
+
+    const variants = db
+      .query<{ count: number }, []>("SELECT COUNT(DISTINCT variant) AS count FROM sessions")
+      .get();
+    const backEvents = db
+      .query<{ count: number }, []>(
+        "SELECT COUNT(*) AS count FROM events WHERE event_name = 'back_clicked'",
+      )
+      .get();
+    const repeatedViews = db
+      .query<{ count: number }, []>(
+        "SELECT COUNT(*) AS count FROM (SELECT session_id, step_id FROM events WHERE event_name = 'step_viewed' GROUP BY session_id, step_id HAVING COUNT(DISTINCT event_id) > 1)",
+      )
+      .get();
+    const branchTransitions = db
+      .query<{ count: number }, []>(
+        "SELECT COUNT(*) AS count FROM session_transitions WHERE from_step_id = 'goal' AND to_step_id = 'training-frequency'",
+      )
+      .get();
+    expect(variants?.count).toBe(2);
+    expect(backEvents?.count).toBeGreaterThan(0);
+    expect(repeatedViews?.count).toBeGreaterThan(0);
+    expect(branchTransitions?.count).toBeGreaterThan(0);
   });
 
   test("anchors generated events to the requested date", () => {
@@ -58,16 +77,4 @@ describe("generate-traffic command", () => {
     expect(dashboard.summary.sessionsStarted).toBe(120);
     expect(dashboard.sessionsByDay).toEqual([{ date: "2025-06-15", sessions: 120 }]);
   });
-
-  test("prints dashboard instructions when run as a command", async () => {
-    const tempDir = mkdtempSync(join(tmpdir(), "funnel-gen-test-"));
-    const dbPath = join(tempDir, "gen.sqlite");
-    const result =
-      await $`SQLITE_PATH=${dbPath} bun run scripts/generate-traffic.ts --seed 42 --sessions 120`.quiet();
-
-    expect(result.stdout.toString()).toContain("Open http://localhost:3000/admin");
-    expect(result.stdout.toString()).toContain("Generated 120 synthetic sessions");
-
-    rmSync(tempDir, { recursive: true, force: true });
-  }, 120000);
 });

@@ -1,3 +1,4 @@
+import { withBasePath } from "@/system/config/base-path";
 import { BatchEventItemSchema, BatchEventResponseSchema } from "@/system/events/event.schema";
 import type { BatchEventInput, BatchEventResult } from "@/system/events/event.types";
 import type { EventProperties } from "@/system/events/event-properties.schema";
@@ -49,11 +50,8 @@ function clearEventIntent(eventId: string): void {
   }
 }
 
-export async function sendEventBatch(events: BatchEventInput[]): Promise<BatchEventResult[]> {
-  for (const event of events) {
-    rememberEventIntent(event);
-  }
-  const response = await fetch("/api/events", {
+async function postEventBatch(events: BatchEventInput[]): Promise<BatchEventResult[]> {
+  const response = await fetch(withBasePath("/api/events"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ events }),
@@ -63,23 +61,61 @@ export async function sendEventBatch(events: BatchEventInput[]): Promise<BatchEv
   }
   const payload = await parseJsonFromReadable(response, BatchEventResponseSchema);
   for (const result of payload.results) {
-    if (result.status === "accepted" || result.status === "duplicate") {
-      clearEventIntent(result.eventId);
-    }
+    clearEventIntent(result.eventId);
   }
   return payload.results;
 }
 
-export async function sendEventWithRetry(event: BatchEventInput): Promise<BatchEventResult> {
-  rememberEventIntent(event);
-  try {
-    const [result] = await sendEventBatch([event]);
-    return result ?? { eventId: event.eventId, status: "rejected", reason: "No result" };
-  } catch {
-    const stored = loadStoredEventIntent(event.eventId) ?? event;
-    const [result] = await sendEventBatch([stored]);
-    return result ?? { eventId: event.eventId, status: "rejected", reason: "Retry failed" };
+function pendingEventIntents(sessionId: string): BatchEventInput[] {
+  const collected = new Map<string, BatchEventInput>();
+  for (const event of pendingEvents.values()) {
+    if (event.sessionId === sessionId) {
+      collected.set(event.eventId, event);
+    }
   }
+  if (typeof window === "undefined") {
+    return [...collected.values()];
+  }
+  for (let index = 0; index < sessionStorage.length; index += 1) {
+    const key = sessionStorage.key(index);
+    if (!key?.startsWith("funnel-event:")) {
+      continue;
+    }
+    const event = loadStoredEventIntent(key.slice("funnel-event:".length));
+    if (event?.sessionId === sessionId) {
+      collected.set(event.eventId, event);
+    }
+  }
+  return [...collected.values()];
+}
+
+export async function sendEventBatch(events: BatchEventInput[]): Promise<BatchEventResult[]> {
+  for (const event of events) {
+    rememberEventIntent(event);
+  }
+  try {
+    return await postEventBatch(events);
+  } catch {
+    const retryEvents = events.map((event) => loadStoredEventIntent(event.eventId) ?? event);
+    return postEventBatch(retryEvents);
+  }
+}
+
+export async function retryPendingEvents(sessionId: string): Promise<void> {
+  const events = pendingEventIntents(sessionId);
+  if (events.length === 0) {
+    return;
+  }
+  try {
+    await sendEventBatch(events);
+  } catch {
+    // Intents remain in sessionStorage for the next page load.
+  }
+}
+
+export async function sendEventWithRetry(event: BatchEventInput): Promise<BatchEventResult> {
+  const [result] = await sendEventBatch([event]);
+  return result ?? { eventId: event.eventId, status: "rejected", reason: "No result" };
 }
 
 export function createEventIntent(input: EventIntentInput): BatchEventInput {

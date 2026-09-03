@@ -21,6 +21,7 @@ import {
   AdminNavLabel,
   AdminNavLink,
 } from "@/components/layout/admin-primitives";
+import { withBasePath } from "@/system/config/base-path";
 
 const MOBILE_NAV_QUERY = "(max-width: 479px)";
 
@@ -40,7 +41,7 @@ function AdminLogoutButton({ collapsed }: { collapsed: boolean }) {
   const router = useRouter();
 
   async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
+    await fetch(withBasePath("/api/admin/logout"), { method: "POST" });
     router.push("/admin/login");
     router.refresh();
   }

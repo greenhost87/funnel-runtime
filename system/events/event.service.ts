@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
-import { validateBatchItem } from "@/system/events/event.schema";
+import * as v from "valibot";
+import { BatchEventItemSchema, validateBatchItem } from "@/system/events/event.schema";
 import type { BatchEventInput, BatchEventResult } from "@/system/events/event.types";
 import { sanitizeEventProperties } from "@/system/events/event-properties.schema";
 import { createEventDao } from "@/system/database/events/event.dao";
@@ -9,6 +10,7 @@ import {
   type SessionRow,
 } from "@/system/database/sessions/session.dao";
 import { createVersionService } from "@/system/versions/version.service";
+import type { JsonValue } from "@/system/http/json";
 
 const BUILT_IN_EVENTS = [
   "session_started",
@@ -26,14 +28,29 @@ function reject(eventId: string, reason: string): BatchEventResult {
   return { eventId, status: "rejected", reason };
 }
 
+const EventIdOnlySchema = v.object({ eventId: v.string() });
+
+type BatchEventCandidate = BatchEventInput | JsonValue;
+
+function readEventId(item: BatchEventCandidate, index: number): string {
+  const parsed = v.safeParse(EventIdOnlySchema, item);
+  return parsed.success ? parsed.output.eventId : `invalid:${index}`;
+}
+
 export function createEventService(db: Database) {
   const events = createEventDao(db);
   const sessions = createSessionDao(db);
   const transitions = createSessionTransitionDao(db);
   const versions = createVersionService(db);
 
-  function processBatch(items: BatchEventInput[]): BatchEventResult[] {
-    return items.map((item) => processOne(item));
+  function processBatch(items: BatchEventCandidate[]): BatchEventResult[] {
+    return items.map((item, index) => {
+      const parsed = v.safeParse(BatchEventItemSchema, item);
+      if (!parsed.success) {
+        return reject(readEventId(item, index), "Invalid event payload");
+      }
+      return processOne(parsed.output);
+    });
   }
 
   function validateEventName(
@@ -113,6 +130,9 @@ export function createEventService(db: Database) {
     const validationError = validateBatchItem(item);
     if (validationError) {
       return reject(item.eventId, validationError);
+    }
+    if (events.eventExists(item.eventId)) {
+      return { eventId: item.eventId, status: "duplicate" };
     }
 
     const session = sessions.getById(item.sessionId);

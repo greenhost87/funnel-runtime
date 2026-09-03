@@ -1,27 +1,19 @@
-import { requireAdminApi } from "@/system/auth/require-admin";
 import { getDatabase } from "@/system/database/connection";
 import { FunnelConfigSchema, parseFunnelConfig } from "@/system/funnel/config.schema";
 import { jsonResponse } from "@/system/http/json";
+import { logger } from "@/system/logging/logger";
+import { withAdminApiLog } from "@/system/logging/with-admin-api-log";
 import { createVersionService } from "@/system/versions/version.service";
 import * as v from "valibot";
 
-export async function GET() {
-  const unauthorized = await requireAdminApi();
-  if (unauthorized) {
-    return unauthorized;
-  }
+export const GET = withAdminApiLog(function GET() {
   const service = createVersionService(getDatabase());
   const active = service.getActive();
   const history = service.getHistory();
   return jsonResponse({ active, history });
-}
+});
 
-export async function POST(request: Request) {
-  const unauthorized = await requireAdminApi();
-  if (unauthorized) {
-    return unauthorized;
-  }
-
+export const POST = withAdminApiLog(async function POST(request: Request) {
   const formData = await request.formData();
   const file = formData.get("config");
   if (!(file instanceof File)) {
@@ -40,5 +32,6 @@ export async function POST(request: Request) {
 
   const service = createVersionService(getDatabase());
   const active = service.publish(config);
+  logger.info("admin.versions.publish", { versionId: active.versionId, configId: active.configId });
   return jsonResponse({ active });
-}
+});

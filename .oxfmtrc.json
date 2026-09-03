@@ -1,0 +1,15 @@
+{
+  "overrides": [
+    {
+      "files": [
+        "system/config/environment.ts",
+        "system/database/connection.ts",
+        "system/database/migrate.ts",
+        "tests/setup/testDatabase.ts"
+      ],
+      "options": {
+        "singleQuote": true
+      }
+    }
+  ]
+}

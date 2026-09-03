@@ -1,13 +1,12 @@
-import { type NextRequest } from "next/server";
-import { requireAdminApi } from "@/system/auth/require-admin";
 import { createAnalyticsService } from "@/system/analytics/analytics.service";
 import { getDatabase } from "@/system/database/connection";
 import { jsonResponse } from "@/system/http/json";
+import { withAdminApiLog } from "@/system/logging/with-admin-api-log";
 import type { AnalyticsFilters } from "@/system/database/analytics/analytics.dao";
 import type { FunnelVariant } from "@/system/funnel/config.types";
 
-function parseFilters(request: NextRequest): AnalyticsFilters {
-  const params = request.nextUrl.searchParams;
+function parseFilters(request: Request): AnalyticsFilters {
+  const params = new URL(request.url).searchParams;
   const variant = params.get("variant");
   const filters: AnalyticsFilters = {};
 
@@ -38,12 +37,7 @@ function parseFilters(request: NextRequest): AnalyticsFilters {
   return filters;
 }
 
-export async function GET(request: NextRequest) {
-  const unauthorized = await requireAdminApi();
-  if (unauthorized) {
-    return unauthorized;
-  }
-
+export const GET = withAdminApiLog(function GET(request: Request) {
   const service = createAnalyticsService(getDatabase());
   return jsonResponse(service.getDashboard(parseFilters(request)));
-}
+});

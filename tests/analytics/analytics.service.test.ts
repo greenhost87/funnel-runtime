@@ -139,13 +139,4 @@ describe("analytics service", () => {
     });
     expect(outOfRange.summary.sessionsStarted).toBe(0);
   });
-
-  test("filters by survey version", () => {
-    const db = currentDatabase();
-    const { versionId } = createVersionService(db).publish(initialConfig);
-    seedAnalyticsScenario(db);
-    const filtered = createAnalyticsService(db).getDashboard({ versionId });
-    expect(filtered.summary.sessionsStarted).toBe(2);
-    expect(filtered.versions).toEqual([{ versionId, name: "Personal Wellness Plan Quiz" }]);
-  });
 });

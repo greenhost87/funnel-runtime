@@ -122,9 +122,40 @@ describe("event service", () => {
         clientTimestamp: new Date().toISOString(),
         stepId: "welcome",
       },
+      { eventId: "malformed-neighbor" },
     ]);
     expect(results[0]?.status).toBe("accepted");
     expect(results[1]?.status).toBe("rejected");
+    expect(results[2]).toEqual({
+      eventId: "malformed-neighbor",
+      status: "rejected",
+      reason: "Invalid event payload",
+    });
+  });
+
+  test("returns duplicate when a completed transition batch is retried", () => {
+    const db = currentDatabase();
+    createVersionService(db).publish(initialConfig);
+    const sessions = createSessionService(db);
+    const session = sessions.createNew({});
+    const transitionId = sessions.recordForwardTransition({
+      sessionId: session.sessionId,
+      fromStepId: "welcome",
+      toStepId: "goal",
+      toResult: false,
+    });
+    const event = {
+      eventId: crypto.randomUUID(),
+      eventName: "step_completed",
+      sessionId: session.sessionId,
+      clientTimestamp: new Date().toISOString(),
+      stepId: "welcome",
+      transitionId,
+    };
+    const service = createEventService(db);
+
+    expect(service.processBatch([event])[0]?.status).toBe("accepted");
+    expect(service.processBatch([event])[0]?.status).toBe("duplicate");
   });
 
   test("accepts each required event type", () => {

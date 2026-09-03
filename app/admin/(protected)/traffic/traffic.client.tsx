@@ -11,6 +11,7 @@ import { AdminCard } from "@/components/layout/class-tagged";
 import { AdminErrorList } from "@/components/layout/admin-primitives";
 import { AdminCardTitle, FormField } from "@/components/layout/primitives";
 import { AnalyticsEmpty } from "@/components/layout/analytics-primitives";
+import { withBasePath } from "@/system/config/base-path";
 import { readAdminErrors } from "@/app/admin/read-admin-errors";
 import { TrafficGenerateResponseSchema } from "@/system/funnel/api-response.schema";
 import { parseJsonFromReadable } from "@/system/http/json";
@@ -66,7 +67,7 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
     setErrors([]);
     setMessage(null);
 
-    const response = await fetch("/api/admin/traffic", {
+    const response = await fetch(withBasePath("/api/admin/traffic"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -1,16 +1,12 @@
-import { requireAdminApi } from "@/system/auth/require-admin";
 import { getDatabase } from "@/system/database/connection";
 import { TrafficGenerateRequestSchema } from "@/system/funnel/api-response.schema";
 import { generateSyntheticTraffic } from "@/system/generator/traffic-generator";
 import { jsonResponse, parseJsonFromReadable } from "@/system/http/json";
+import { logger } from "@/system/logging/logger";
+import { withAdminApiLog } from "@/system/logging/with-admin-api-log";
 import { createVersionService } from "@/system/versions/version.service";
 
-export async function POST(request: Request) {
-  const unauthorized = await requireAdminApi();
-  if (unauthorized) {
-    return unauthorized;
-  }
-
+export const POST = withAdminApiLog(async function POST(request: Request) {
   let body;
   try {
     body = await parseJsonFromReadable(request, TrafficGenerateRequestSchema);
@@ -30,5 +26,10 @@ export async function POST(request: Request) {
     anchorDate: body.date,
   });
 
+  logger.info("admin.traffic.generate", {
+    versionId: body.versionId,
+    generatedSessions,
+    date: body.date,
+  });
   return jsonResponse({ generatedSessions });
-}
+});

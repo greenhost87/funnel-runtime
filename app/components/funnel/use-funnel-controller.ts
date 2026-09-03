@@ -12,9 +12,11 @@ import { parseJsonFromReadable } from "@/system/http/json";
 import {
   createEventId,
   createEventIntent,
+  retryPendingEvents,
   sendEventBatch,
   sendEventWithRetry,
 } from "@/app/components/funnel/event-client";
+import { withBasePath } from "@/system/config/base-path";
 
 type ControllerState = {
   data: FunnelApiState | null;
@@ -77,6 +79,8 @@ export function useFunnelController(initialQuery = "") {
 
   const bootstrapEvents = useCallback(
     async (data: FunnelApiState) => {
+      await retryPendingEvents(data.sessionId);
+
       if (data.pendingSessionStarted && !sessionStartedSent.current) {
         const result = await sendEventWithRetry(
           createEventIntent({
@@ -103,7 +107,9 @@ export function useFunnelController(initialQuery = "") {
 
   const loadSession = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
-    const response = await fetch(`/api/funnel/session${initialQuery}`, { method: "GET" });
+    const response = await fetch(withBasePath(`/api/funnel/session${initialQuery}`), {
+      method: "GET",
+    });
     if (!response.ok) {
       setState((prev) => ({ ...prev, loading: false, error: "Failed to load session" }));
       return;
@@ -149,7 +155,7 @@ export function useFunnelController(initialQuery = "") {
       return;
     }
     const stepId = current.state.currentStepId;
-    const response = await fetch("/api/funnel/answer", {
+    const response = await fetch(withBasePath("/api/funnel/answer"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stepId, answer: state.draftAnswer }),
@@ -189,7 +195,7 @@ export function useFunnelController(initialQuery = "") {
       return;
     }
     const stepId = current.state.currentStepId;
-    const response = await fetch("/api/funnel/advance", { method: "POST" });
+    const response = await fetch(withBasePath("/api/funnel/advance"), { method: "POST" });
     const payload = await applyMutation(response);
     if (!payload?.transitionId || !stepId) {
       return;
@@ -217,7 +223,7 @@ export function useFunnelController(initialQuery = "") {
     if (!current) {
       return;
     }
-    const response = await fetch("/api/funnel/back", { method: "POST" });
+    const response = await fetch(withBasePath("/api/funnel/back"), { method: "POST" });
     const payload = await applyMutation(response);
     if (!payload) {
       return;

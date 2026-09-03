@@ -28,13 +28,6 @@ await bunSpawn(["bun", "run", "scripts/migrate.ts"], {
   stderr: "inherit",
 }).exited;
 
-await bunSpawn(["bun", "run", "scripts/seed.ts"], {
-  cwd: process.cwd(),
-  env,
-  stdout: "inherit",
-  stderr: "inherit",
-}).exited;
-
 const server = bunSpawn(["bun", "--bun", "next", "start", "-p", String(port), "-H", "127.0.0.1"], {
   cwd: process.cwd(),
   env,

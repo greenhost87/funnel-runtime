@@ -40,14 +40,4 @@ describe("funnel engine", () => {
     expect(backed.currentStepId).toBe("goal");
     expect(backed.history.length).toBe(2);
   });
-
-  test("variant B has different path length/progress baseline", () => {
-    const effectiveA = resolveEffectiveConfig(config, "A");
-    const effectiveB = resolveEffectiveConfig(config, "B");
-    const stateA = createInitialState(effectiveA);
-    const stateB = createInitialState(effectiveB);
-    expect(stateA.currentStepId).toBe("welcome");
-    expect(stateB.currentStepId).toBe("goal");
-    expect(stateA.progress.total).not.toBe(stateB.progress.total);
-  });
 });

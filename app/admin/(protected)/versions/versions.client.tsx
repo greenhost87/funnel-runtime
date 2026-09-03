@@ -9,6 +9,7 @@ import { VersionsHistoryTable } from "@/app/components/versions/versions-history
 import { AdminErrorList } from "@/components/layout/admin-primitives";
 import { AdminCardTitle, FormField } from "@/components/layout/primitives";
 import { AnalyticsEmpty } from "@/components/layout/analytics-primitives";
+import { withBasePath } from "@/system/config/base-path";
 import { readAdminErrors } from "@/app/admin/read-admin-errors";
 import { VersionsListResponseSchema } from "@/system/funnel/api-response.schema";
 import type { ActiveVersionSnapshot } from "@/system/versions/version.service";
@@ -28,7 +29,7 @@ type Props = {
 };
 
 async function loadVersionsState() {
-  const response = await fetch("/api/admin/versions");
+  const response = await fetch(withBasePath("/api/admin/versions"));
   return parseJsonFromReadable(response, VersionsListResponseSchema);
 }
 
@@ -70,7 +71,8 @@ export function VersionsClient({ initialActive, initialHistory }: Props) {
     await runVersionsMutation(
       setLoading,
       setErrors,
-      async () => fetch("/api/admin/versions", { method: "POST", body: new FormData(form) }),
+      async () =>
+        fetch(withBasePath("/api/admin/versions"), { method: "POST", body: new FormData(form) }),
       async () => {
         await refreshVersionsState(setActive, setHistory);
         form.reset();
@@ -83,7 +85,7 @@ export function VersionsClient({ initialActive, initialHistory }: Props) {
       setLoading,
       setErrors,
       async () =>
-        fetch("/api/admin/versions/rollback", {
+        fetch(withBasePath("/api/admin/versions/rollback"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ versionId }),

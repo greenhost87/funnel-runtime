@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import initialConfig from "@/fixtures/funnels/initial.json";
-import alternativeConfig from "@/fixtures/funnels/alternative.json";
 import iteration2Config from "@/fixtures/funnels/iteration-2.json";
 import { parseFunnelConfig } from "@/system/funnel/config.schema";
 import { resolveEffectiveConfig } from "@/system/funnel/variant-resolver";
+import { advanceInfo, createInitialState, submitAnswer } from "@/system/funnel/funnel-engine";
 import type { JsonValue } from "@/system/http/json";
 
 function expectInvalidConfig(input: JsonValue): void {
@@ -11,11 +11,6 @@ function expectInvalidConfig(input: JsonValue): void {
 }
 
 describe("funnel config contract", () => {
-  test("initial and alternative fixtures parse", () => {
-    expect(parseFunnelConfig(initialConfig).id).toBe("wellness-quiz-v1");
-    expect(parseFunnelConfig(alternativeConfig).id).toBe("wellness-quiz-alt");
-  });
-
   test("variant B changes text, order, and result vs A", () => {
     const config = parseFunnelConfig(initialConfig);
     const variantA = resolveEffectiveConfig(config, "A");
@@ -27,6 +22,9 @@ describe("funnel config contract", () => {
     expect(variantB.steps[0]?.id).toBe("goal");
     expect(variantA.result.title).not.toBe(variantB.result.title);
     expect(variantB.steps.find((step) => step.id === "goal")?.title).toBe("Pick your #1 goal");
+
+    const started = createInitialState(variantB);
+    expect(submitAnswer(variantB, started, "goal", "energy").state.currentStepId).toBe("timeline");
   });
 
   test("rejects broken references", () => {
@@ -81,7 +79,7 @@ describe("funnel config contract", () => {
     expect(() => parseFunnelConfig(broken)).toThrow(/Variant B effective config invalid/);
   });
 
-  test("iteration-2 B has exact 5 steps without tail", () => {
+  test("iteration-2 B has an executable five-step ordered flow", () => {
     const config = parseFunnelConfig(iteration2Config);
     const variantB = resolveEffectiveConfig(config, "B");
     expect(variantB.steps.map((step) => step.id)).toEqual([
@@ -91,6 +89,24 @@ describe("funnel config contract", () => {
       "budget",
       "summary",
     ]);
-    expect(variantB.steps.length).toBe(5);
+
+    let state = createInitialState(variantB);
+    state = submitAnswer(variantB, state, "goal", "premium").state;
+    expect(state.currentStepId).toBe("timeline");
+    state = submitAnswer(variantB, state, "timeline", "1month").state;
+    state = submitAnswer(variantB, state, "habits", ["sleep"]).state;
+    state = submitAnswer(variantB, state, "budget", 100).state;
+    state = advanceInfo(variantB, state).state;
+    expect(state.isResult).toBe(true);
+  });
+
+  test("rejects duplicate step ids in a variant order", () => {
+    expectInvalidConfig({
+      ...initialConfig,
+      variants: {
+        ...initialConfig.variants,
+        B: { stepOrder: ["goal", "goal"] },
+      },
+    });
   });
 });

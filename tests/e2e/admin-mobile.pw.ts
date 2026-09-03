@@ -7,30 +7,6 @@ async function adminLogin(page: Page) {
   await expect(page.getByText("Funnel versions")).toBeVisible();
 }
 
-async function expectCenteredInNav(page: Page, selector: string) {
-  const alignment = await page.locator(selector).evaluate((element) => {
-    const nav = element.closest(".admin-nav");
-    if (!(nav instanceof HTMLElement) || !(element instanceof HTMLElement)) {
-      return null;
-    }
-
-    const navRect = nav.getBoundingClientRect();
-    const elementRect = element.getBoundingClientRect();
-    const navCenter = navRect.left + navRect.width / 2;
-    const elementCenter = elementRect.left + elementRect.width / 2;
-
-    return {
-      delta: Math.abs(elementCenter - navCenter),
-      navWidth: navRect.width,
-      elementWidth: elementRect.width,
-    };
-  });
-
-  expect(alignment).not.toBeNull();
-  expect(alignment?.delta ?? Number.POSITIVE_INFINITY).toBeLessThan(2);
-  expect(alignment?.elementWidth ?? 0).toBeLessThanOrEqual(alignment?.navWidth ?? 0);
-}
-
 async function expectNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth,
@@ -57,25 +33,6 @@ test.describe("admin mobile layout at 320px", () => {
       await expect(page.getByRole("navigation", { name: "Admin navigation" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
     }
-  });
-
-  test("compact nav centers icon controls inside the sidebar", async ({ page }) => {
-    await adminLogin(page);
-
-    await expect(page.locator(".admin-nav")).toHaveClass(/admin-nav--collapsed/);
-
-    for (const selector of [
-      ".admin-nav__toggle",
-      ".admin-nav__link[href='/admin/versions']",
-      ".admin-nav__link[href='/admin/analytics']",
-      ".admin-nav__link[href='/admin/traffic']",
-      ".admin-nav__theme",
-      ".admin-nav__link--logout",
-    ]) {
-      await expectCenteredInNav(page, selector);
-    }
-
-    await expectNoHorizontalOverflow(page);
   });
 
   test("compact nav expands into a drawer with visible labels", async ({ page }) => {

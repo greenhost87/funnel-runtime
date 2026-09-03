@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { themeInitScript } from "@/system/theme/theme";
+import "@/app/bootstrap-retention-cron";
 import "./styles/main.scss";
 
 export const metadata: Metadata = {

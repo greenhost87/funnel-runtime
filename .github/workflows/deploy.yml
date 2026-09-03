@@ -16,14 +16,13 @@ env:
   SERVER_HOST: ${{ secrets.SERVER_HOST }}
   SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
   SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT }}
-  TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
-  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
   APP_PORT: ${{ secrets.APP_PORT }}
-  PROJECT_NAME: 'funnel-runtime'
-  ARTIFACT_NAME: 'funnel-runtime.tar.gz'
-  DEPLOY_PATH: '/opt/data/deploy/funnel-runtime'
-  APP_PATH: '/opt/data/funnel-runtime'
-  ENV_FILE_PATH: '/opt/data/config/funnel-runtime.env'
+  BASE_PATH: ${{ secrets.BASE_PATH }}
+  PROJECT_NAME: "funnel-runtime"
+  ARTIFACT_NAME: "funnel-runtime.tar.gz"
+  DEPLOY_PATH: "/opt/data/deploy/funnel-runtime"
+  APP_PATH: "/opt/data/funnel-runtime"
+  ENV_FILE_PATH: "/opt/data/config/funnel-runtime.env"
 
 jobs:
   build-and-deploy:
@@ -59,19 +58,10 @@ jobs:
             echo "required=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Send Telegram message (start)
-        uses: appleboy/telegram-action@78c9ef35ffccfe74d3b32e26efcd34c2e283238a # master
-        with:
-          to: ${{ env.TELEGRAM_TO }}
-          token: ${{ env.TELEGRAM_TOKEN }}
-          format: markdown
-          message: |
-            *FUNNEL RUNTIME*: Begin PRODUCTION build and deploy
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: '1.4.0'
+          bun-version: "1.4.0"
 
       - name: Cache Bun dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -89,6 +79,8 @@ jobs:
         run: bun test ./tests/deploy/run-archive.integration.ts
 
       - name: Build deployment artifact
+        env:
+          BASE_PATH: ${{ env.BASE_PATH }}
         run: bash .github/workflows/scripts/build-artifact.sh
 
       - name: Copy files to server
@@ -98,7 +90,7 @@ jobs:
           username: ${{ env.SERVER_USERNAME }}
           port: ${{ env.SERVER_SSH_PORT }}
           key: ${{ secrets.PROD_SERVER_SSH_KEY }}
-          source: '${{ env.ARTIFACT_NAME }},.github/workflows/scripts/run-archive.sh,.github/workflows/scripts/funnel-runtime.service'
+          source: "${{ env.ARTIFACT_NAME }},.github/workflows/scripts/run-archive.sh,.github/workflows/scripts/funnel-runtime.service"
           target: ${{ env.DEPLOY_PATH }}
 
       - name: Execute deployment script
@@ -108,34 +100,15 @@ jobs:
           APP_PATH: ${{ env.APP_PATH }}
           ENV_FILE_PATH: ${{ env.ENV_FILE_PATH }}
           APP_PORT: ${{ env.APP_PORT }}
+          BASE_PATH: ${{ env.BASE_PATH }}
         uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         with:
           host: ${{ env.SERVER_HOST }}
           username: ${{ env.SERVER_USERNAME }}
           port: ${{ env.SERVER_SSH_PORT }}
           key: ${{ secrets.PROD_SERVER_SSH_KEY }}
-          envs: PROJECT_NAME,ARTIFACT_PATH,APP_PATH,ENV_FILE_PATH,APP_PORT
+          envs: PROJECT_NAME,ARTIFACT_PATH,APP_PATH,ENV_FILE_PATH,APP_PORT,BASE_PATH
           script: |
             cd ${{ env.DEPLOY_PATH }}
             chmod +x .github/workflows/scripts/run-archive.sh
             .github/workflows/scripts/run-archive.sh
-
-      - name: Send Telegram message (failure)
-        if: failure()
-        uses: appleboy/telegram-action@78c9ef35ffccfe74d3b32e26efcd34c2e283238a # master
-        with:
-          to: ${{ env.TELEGRAM_TO }}
-          token: ${{ env.TELEGRAM_TOKEN }}
-          format: markdown
-          message: |
-            *FUNNEL RUNTIME*: Build and deploy failed
-
-      - name: Send Telegram message (success)
-        if: success()
-        uses: appleboy/telegram-action@78c9ef35ffccfe74d3b32e26efcd34c2e283238a # master
-        with:
-          to: ${{ env.TELEGRAM_TO }}
-          token: ${{ env.TELEGRAM_TOKEN }}
-          format: markdown
-          message: |
-            *FUNNEL RUNTIME*: Build and deploy completed successfully

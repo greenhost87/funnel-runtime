@@ -37,15 +37,51 @@ function resolveStepOrder(config: FunnelConfig, variant: FunnelVariant): string[
   return override.stepOrder.filter((id) => !excluded.has(id));
 }
 
+function orderedDefaultTransition(
+  step: FunnelStep,
+  nextStepId: string | undefined,
+  variant: FunnelVariant,
+) {
+  const existingDefault = step.transitions.find((transition) => !transition.when);
+  return {
+    id: existingDefault?.id ?? `${step.id}-${variant.toLowerCase()}-next`,
+    target: nextStepId
+      ? ({ type: "step", stepId: nextStepId } as const)
+      : ({ type: "result" } as const),
+  };
+}
+
+function applyOrderedTransitions(
+  steps: FunnelStep[],
+  variant: FunnelVariant,
+  hasOrderOverride: boolean,
+): FunnelStep[] {
+  if (!hasOrderOverride) {
+    return steps;
+  }
+
+  const stepIds = new Set(steps.map((step) => step.id));
+  return steps.map((step, index) => ({
+    ...step,
+    transitions: [
+      ...step.transitions.filter(
+        (transition) => transition.when && isTransitionTargetValid(transition.target, stepIds),
+      ),
+      orderedDefaultTransition(step, steps[index + 1]?.id, variant),
+    ],
+  }));
+}
+
 function buildEffectiveSteps(config: FunnelConfig, variant: FunnelVariant): FunnelStep[] {
   const stepMap = new Map(config.steps.map((step) => [step.id, step]));
   const order = resolveStepOrder(config, variant);
-  const textOverrides = config.variants[variant].stepTextOverrides;
-
-  return order
+  const override = config.variants[variant];
+  const steps = order
     .map((id) => stepMap.get(id))
     .filter((step): step is FunnelStep => step !== undefined)
-    .map((step) => applyTextOverrides(step, textOverrides));
+    .map((step) => applyTextOverrides(step, override.stepTextOverrides));
+
+  return applyOrderedTransitions(steps, variant, override.stepOrder !== undefined);
 }
 
 function buildEffectiveResult(config: FunnelConfig, variant: FunnelVariant): ResultConfig {

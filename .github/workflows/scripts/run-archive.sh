@@ -33,7 +33,12 @@ require_command() {
 }
 
 wait_for_health() {
-  local health_url="http://127.0.0.1:$APP_PORT/api/health"
+  local base_path="${BASE_PATH:-}"
+  base_path="${base_path%/}"
+  if [ "$base_path" = "/" ]; then
+    base_path=""
+  fi
+  local health_url="http://127.0.0.1:$APP_PORT${base_path}/api/health"
   local attempt
 
   health_response=''
@@ -167,7 +172,7 @@ main() {
 
   cd "$RELEASE_PATH"
   bun install --production --frozen-lockfile
-  bun --env-file="$ENV_FILE_PATH" run validate:production-env
+  bun --env-file="$ENV_FILE_PATH" run scripts/validate-production-env.ts
   bun --env-file="$ENV_FILE_PATH" run migrate
 
   bun_path="$(command -v bun)"

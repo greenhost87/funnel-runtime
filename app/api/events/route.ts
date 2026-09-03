@@ -2,8 +2,9 @@ import { getDatabase } from "@/system/database/connection";
 import { BatchEventSchema } from "@/system/events/event.schema";
 import { createEventService } from "@/system/events/event.service";
 import { jsonResponse, parseJsonFromReadable } from "@/system/http/json";
+import { withApiLog } from "@/system/logging/with-api-log";
 
-export async function POST(request: Request) {
+export const POST = withApiLog(async function POST(request: Request) {
   let items;
   try {
     const body = await parseJsonFromReadable(request, BatchEventSchema);
@@ -18,4 +19,4 @@ export async function POST(request: Request) {
   const service = createEventService(getDatabase());
   const results = service.processBatch(items);
   return jsonResponse({ results });
-}
+});

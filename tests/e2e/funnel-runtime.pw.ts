@@ -123,6 +123,11 @@ test.describe("funnel runtime e2e", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Pick your #1 goal");
     await page.getByText("Boost daily energy and focus").click();
     await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "How soon do you want results?",
+    );
+    await page.getByText("Within 1 month").click();
+    await page.getByRole("button", { name: "Next" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("What needs work?");
   });
 
@@ -166,7 +171,7 @@ test.describe("funnel runtime e2e", () => {
       if (started) {
         sessionStartedEventId = started.eventId;
         sessionStartedPosts += 1;
-        if (sessionStartedPosts === 1) {
+        if (sessionStartedPosts <= 2) {
           await route.abort("failed");
           return;
         }
@@ -175,13 +180,17 @@ test.describe("funnel runtime e2e", () => {
     });
 
     await openFunnel(page, "/?variant=A");
-    await expect.poll(() => sessionStartedPosts).toBeGreaterThanOrEqual(2);
+    await expect.poll(() => sessionStartedPosts).toBe(2);
     expect(sessionStartedEventId).toBeTruthy();
 
-    const beforeReload = sessionStartedPosts;
+    await reloadFunnel(page);
+    await expect.poll(() => sessionStartedPosts).toBeGreaterThanOrEqual(3);
+    await page.waitForTimeout(500);
+    const afterRecovery = sessionStartedPosts;
+
     await reloadFunnel(page);
     await page.waitForTimeout(500);
-    expect(sessionStartedPosts).toBe(beforeReload);
+    expect(sessionStartedPosts).toBe(afterRecovery);
   });
 
   test("admin publication, analytics, and rollback", async ({ page }) => {
@@ -295,6 +304,26 @@ test.describe("funnel runtime e2e", () => {
     });
     const customPayload = v.parse(CustomEventResponseSchema, await customEventResponse.json());
     expect(customPayload.results[0]?.status).toBe("accepted");
+
+    const variantBContext = await browser.newContext();
+    const variantBPage = await variantBContext.newPage();
+    await openFunnel(variantBPage, "/?variant=B");
+    await variantBPage.getByText("Premium coaching program").click();
+    await variantBPage.getByRole("button", { name: "Next" }).click();
+    await expect(variantBPage.getByRole("heading", { level: 1 })).toContainText(
+      "When would you like to see meaningful results?",
+    );
+    await variantBPage.getByText("Within 1 month").click();
+    await variantBPage.getByRole("button", { name: "Next" }).click();
+    await variantBPage.getByText("Nutrition and meal planning").click();
+    await variantBPage.getByRole("button", { name: "Next" }).click();
+    await variantBPage
+      .getByLabel("Monthly budget for wellness products and services (USD)")
+      .fill("100");
+    await variantBPage.getByRole("button", { name: "Next" }).click();
+    await variantBPage.getByRole("button", { name: "Continue" }).click();
+    await expect(variantBPage.getByText("Your fast-track wellness wins")).toBeVisible();
+    await variantBContext.close();
   });
 
   test("admin routes require authentication", async ({ page }) => {

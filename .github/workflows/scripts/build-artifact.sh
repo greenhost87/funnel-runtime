@@ -30,6 +30,7 @@ main() {
   require_file next.config.ts
   require_file tsconfig.json
   require_file system/config/environment.ts
+  require_file system/config/base-path.ts
   require_dir system/database
   require_file scripts/migrate.ts
   require_file scripts/validate-production-env.ts
@@ -39,7 +40,7 @@ main() {
   rm -rf "$ARTIFACT_DIR" "$ARTIFACT_PATH"
 
   bun run fmt:check
-  bun run typecheck
+  bun --bun next typegen && bunx tsc --noEmit
   bun test
   bun --bun next build
 
@@ -52,7 +53,7 @@ main() {
   cp -R .next "$ARTIFACT_DIR/"
   rm -rf "$ARTIFACT_DIR/.next/cache" "$ARTIFACT_DIR/.next/dev"
   cp package.json bun.lock next.config.ts tsconfig.json bunfig.toml "$ARTIFACT_DIR/"
-  cp system/config/environment.ts "$ARTIFACT_DIR/system/config/"
+  cp system/config/environment.ts system/config/base-path.ts "$ARTIFACT_DIR/system/config/"
   cp -R system/database "$ARTIFACT_DIR/system/"
   cp scripts/migrate.ts scripts/validate-production-env.ts "$ARTIFACT_DIR/scripts/"
   cp -R migrations "$ARTIFACT_DIR/"

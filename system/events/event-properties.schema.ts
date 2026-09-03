@@ -1,6 +1,7 @@
 import * as v from "valibot";
+import type { JsonValue } from "@/system/http/json";
 
-const EventPropertyValueSchema: v.GenericSchema = v.lazy(() =>
+export const EventPropertyValueSchema: v.GenericSchema<JsonValue> = v.lazy(() =>
   v.union([
     v.string(),
     v.number(),

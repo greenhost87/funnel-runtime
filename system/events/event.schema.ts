@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { BatchEventInput } from "./event.types";
-import { EventPropertiesSchema } from "./event-properties.schema";
+import { EventPropertiesSchema, EventPropertyValueSchema } from "./event-properties.schema";
 import { validateEventProperties } from "./event-properties.schema";
 
 export const BatchEventItemSchema = v.object({
@@ -14,7 +14,7 @@ export const BatchEventItemSchema = v.object({
 });
 
 export const BatchEventSchema = v.object({
-  events: v.array(BatchEventItemSchema),
+  events: v.array(EventPropertyValueSchema),
 });
 
 const BatchEventResultSchema = v.union([

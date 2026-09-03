@@ -2,6 +2,7 @@
 
 import { useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
+import { withBasePath } from "@/system/config/base-path";
 import { PrimarySubmitButton } from "@/components/ui/action-buttons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,7 @@ export default function AdminLoginPage() {
     event.preventDefault();
     setLoading(true);
     setError(null);
-    const response = await fetch("/api/admin/login", {
+    const response = await fetch(withBasePath("/api/admin/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),

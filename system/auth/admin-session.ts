@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getCookiePath } from "@/system/config/base-path";
 import { getRequiredEnv, isNodeEnvironment } from "@/system/config/environment";
 
 export const ADMIN_COOKIE_NAME = "funnel_admin_session";
@@ -53,7 +54,7 @@ export function getAdminCookieOptions(): {
     httpOnly: true,
     sameSite: "lax",
     secure: isNodeEnvironment("production"),
-    path: "/",
+    path: getCookiePath(),
     maxAge: MAX_AGE_SECONDS,
   };
 }

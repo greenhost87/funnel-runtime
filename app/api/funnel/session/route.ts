@@ -1,4 +1,3 @@
-import { type NextRequest } from "next/server";
 import { getDatabase } from "@/system/database/connection";
 import {
   buildApiState,
@@ -9,6 +8,7 @@ import {
   setSessionCookie,
 } from "@/system/http/funnel-api.helpers";
 import { jsonResponse } from "@/system/http/json";
+import { withApiLog } from "@/system/logging/with-api-log";
 
 function createSessionResponse(
   db: ReturnType<typeof getDatabase>,
@@ -28,16 +28,17 @@ function createSessionResponse(
   return response;
 }
 
-export async function GET(request: NextRequest) {
+async function handleSessionRequest(request: Request, alwaysSetCookie: boolean): Promise<Response> {
   const existingId = await getSessionIdFromCookie();
-  return createSessionResponse(getDatabase(), existingId, request.nextUrl.searchParams, {
-    alwaysSetCookie: false,
+  return createSessionResponse(getDatabase(), existingId, new URL(request.url).searchParams, {
+    alwaysSetCookie,
   });
 }
 
-export async function POST(request: NextRequest) {
-  const existingId = await getSessionIdFromCookie();
-  return createSessionResponse(getDatabase(), existingId, request.nextUrl.searchParams, {
-    alwaysSetCookie: true,
-  });
-}
+export const GET = withApiLog(async function GET(request: Request) {
+  return handleSessionRequest(request, false);
+});
+
+export const POST = withApiLog(async function POST(request: Request) {
+  return handleSessionRequest(request, true);
+});

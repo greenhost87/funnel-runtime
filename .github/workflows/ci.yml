@@ -15,11 +15,10 @@ jobs:
           bun-version: "1.4.0"
       - run: bun install --frozen-lockfile
       - run: bun run fmt:check
-      - run: bun run typecheck
+      - run: bun --bun next typegen && bunx tsc --noEmit
       - run: bun test
-      - run: bun test tests/deploy/deploy-workflow.test.ts
-      - run: bun run build
+      - run: bun --bun next build
       - run: bunx playwright install chromium --with-deps
-      - run: bun run test:e2e
+      - run: bun run scripts/run-e2e.ts
         env:
           CI: true

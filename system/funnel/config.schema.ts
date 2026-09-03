@@ -181,6 +181,12 @@ function validateVariantOverrides(config: FunnelConfig, stepIds: Set<string>): s
     const override = config.variants[variant];
     if (override.stepOrder) {
       errors.push(...validateVariantStepList(variant, stepIds, override.stepOrder, "stepOrder"));
+      if (override.stepOrder.length === 0) {
+        errors.push(`Variant ${variant} stepOrder must not be empty`);
+      }
+      if (new Set(override.stepOrder).size !== override.stepOrder.length) {
+        errors.push(`Variant ${variant} stepOrder must contain unique step ids`);
+      }
     }
     if (override.excludedStepIds) {
       errors.push(
