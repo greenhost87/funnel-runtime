@@ -28,8 +28,28 @@ test("withBasePath is a no-op without BASE_PATH", () => {
   expect(getCookiePath()).toBe("/");
 });
 
-test("NEXT_PUBLIC_BASE_PATH wins over BASE_PATH for client bundles", () => {
+test("NEXT_PUBLIC_BASE_PATH wins over BASE_PATH for server rendering", () => {
   setEnv("BASE_PATH", "/from-server");
   setEnv("NEXT_PUBLIC_BASE_PATH", "/from-build");
   expect(withBasePath("/api/health")).toBe("/from-build/api/health");
+});
+
+test("withBasePath reads the rendered base path in the browser", () => {
+  const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: { documentElement: { dataset: { basePath: "/from-document" } } },
+  });
+
+  try {
+    expect(withBasePath("/api/admin/login")).toBe("/from-document/api/admin/login");
+    expect(withBasePath("/api/funnel/session")).toBe("/from-document/api/funnel/session");
+    expect(withBasePath("/api/events")).toBe("/from-document/api/events");
+  } finally {
+    if (documentDescriptor) {
+      Object.defineProperty(globalThis, "document", documentDescriptor);
+    } else {
+      delete (globalThis as { document?: unknown }).document;
+    }
+  }
 });

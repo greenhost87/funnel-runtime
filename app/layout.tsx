@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { getBasePath } from "@/system/config/base-path";
 import { themeInitScript } from "@/system/theme/theme";
 import "@/app/bootstrap-retention-cron";
 import "./styles/main.scss";
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-base-path={getBasePath() || undefined} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

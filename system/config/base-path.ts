@@ -15,7 +15,10 @@ export function normalizeBasePath(raw: string | undefined): string {
   return withLeadingSlash.replace(/\/+$/, "");
 }
 
-function getBasePath(): string {
+export function getBasePath(): string {
+  if (typeof document !== "undefined") {
+    return normalizeBasePath(document.documentElement.dataset.basePath);
+  }
   return normalizeBasePath(getOptionalEnv("NEXT_PUBLIC_BASE_PATH") ?? getOptionalEnv("BASE_PATH"));
 }
 
