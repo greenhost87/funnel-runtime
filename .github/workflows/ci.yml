@@ -17,6 +17,7 @@ jobs:
       - run: bun run fmt:check
       - run: bun run typecheck
       - run: bun test
+      - run: bun test tests/deploy/deploy-workflow.test.ts
       - run: bun run build
       - run: bunx playwright install chromium --with-deps
       - run: bun run test:e2e

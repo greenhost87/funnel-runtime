@@ -60,5 +60,14 @@ export const AnalyticsDashboardSchema = v.object({
     }),
   ),
   campaigns: v.array(v.string()),
-  versions: v.array(v.string()),
+  versions: v.array(
+    v.object({
+      versionId: v.string(),
+      name: v.string(),
+    }),
+  ),
+  labels: v.object({
+    versions: v.record(v.string(), v.string()),
+    steps: v.record(v.string(), v.string()),
+  }),
 });

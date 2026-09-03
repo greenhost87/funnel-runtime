@@ -6,7 +6,42 @@
 }
 
 .analytics-chart-panel {
+  display: flex;
+  flex-direction: column;
   margin-bottom: 0;
+}
+
+.analytics-chart-panel--wide {
+  grid-column: 1 / -1;
+}
+
+.analytics-chart-panel__body {
+  min-width: 0;
+}
+
+.analytics-chart-panel__body--interactive {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s ease;
+}
+
+.analytics-chart-panel__body--interactive:hover {
+  background: var(--bulma-primary-soft);
+}
+
+.analytics-chart-panel__body--selected {
+  background: var(--bulma-primary-soft);
+}
+
+.analytics-chart-panel--selected {
+  border-color: var(--bulma-primary);
+  box-shadow: 0 0 0 1px var(--bulma-primary);
+}
+
+.analytics-chart-panel__hint {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--bulma-text-weak);
 }
 
 .analytics-chart-panel__canvas {

@@ -11,7 +11,11 @@ import { AnalyticsDashboardSchema } from "@/system/analytics/analytics.schema";
 import type { AnalyticsDashboard } from "@/system/analytics/analytics.service";
 import { parseJsonFromReadable } from "@/system/http/json";
 import { ComparisonTable, EdgeTable } from "@/app/components/analytics/analytics-tables";
-import { AnalyticsCharts } from "@/app/components/analytics/analytics-charts";
+import {
+  ANALYTICS_DETAIL_PANELS,
+  AnalyticsCharts,
+  type AnalyticsDetailPanel,
+} from "@/app/components/analytics/analytics-charts";
 import { SummaryCards } from "@/app/components/analytics/summary-cards";
 
 type FilterState = {
@@ -47,8 +51,8 @@ function buildAnalyticsQuery(filters: FilterState): string {
   return query ? `?${query}` : "";
 }
 
-function formatVersionLabel(versionId: string): string {
-  return versionId.length > 12 ? `${versionId.slice(0, 8)}…` : versionId;
+function formatVersionLabel(name: string, versionId: string): string {
+  return name || (versionId.length > 12 ? `${versionId.slice(0, 8)}…` : versionId);
 }
 
 type AnalyticsFilterHandlers = {
@@ -76,7 +80,13 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
     dateTo: "",
   });
   const [loading, setLoading] = useState(false);
+  const [detailPanel, setDetailPanel] = useState<AnalyticsDetailPanel | null>(null);
   const filterHandlers: AnalyticsFilterHandlers = { setFilters, setLoading, setData };
+
+  function updateFilters(nextFilters: FilterState) {
+    setDetailPanel(null);
+    void applyAnalyticsFilters(nextFilters, filterHandlers);
+  }
 
   return (
     <div>
@@ -88,10 +98,7 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
           value={filters.campaign}
           disabled={loading}
           onChange={(event) => {
-            void applyAnalyticsFilters(
-              { ...filters, campaign: event.target.value },
-              filterHandlers,
-            );
+            updateFilters({ ...filters, campaign: event.target.value });
           }}
         >
           <Option value="">All campaigns</Option>
@@ -107,7 +114,7 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
           value={filters.variant}
           disabled={loading}
           onChange={(event) => {
-            void applyAnalyticsFilters({ ...filters, variant: event.target.value }, filterHandlers);
+            updateFilters({ ...filters, variant: event.target.value });
           }}
         >
           <Option value="">All variants</Option>
@@ -116,20 +123,17 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
         </Select>
         <Select
           id="versionId"
-          label="Version"
+          label="Survey version"
           value={filters.versionId}
           disabled={loading}
           onChange={(event) => {
-            void applyAnalyticsFilters(
-              { ...filters, versionId: event.target.value },
-              filterHandlers,
-            );
+            updateFilters({ ...filters, versionId: event.target.value });
           }}
         >
           <Option value="">All versions</Option>
           {data.versions.map((item) => (
-            <Option key={item} value={item}>
-              {formatVersionLabel(item)}
+            <Option key={item.versionId} value={item.versionId}>
+              {formatVersionLabel(item.name, item.versionId)}
             </Option>
           ))}
         </Select>
@@ -140,7 +144,7 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
             value={filters.dateFrom}
             disabled={loading}
             onChange={(nextValue) => {
-              void applyAnalyticsFilters({ ...filters, dateFrom: nextValue }, filterHandlers);
+              updateFilters({ ...filters, dateFrom: nextValue });
             }}
           />
         </FormField>
@@ -151,7 +155,7 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
             value={filters.dateTo}
             disabled={loading}
             onChange={(nextValue) => {
-              void applyAnalyticsFilters({ ...filters, dateTo: nextValue }, filterHandlers);
+              updateFilters({ ...filters, dateTo: nextValue });
             }}
           />
         </FormField>
@@ -161,9 +165,16 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
         stepFunnel={data.stepFunnel}
         sessionsByDay={data.sessionsByDay}
         comparisons={data.comparisons}
+        labels={data.labels}
+        detailPanel={detailPanel}
+        onDetailPanelChange={setDetailPanel}
       />
-      <EdgeTable edges={data.edges} />
-      <ComparisonTable comparisons={data.comparisons} />
+      {detailPanel === ANALYTICS_DETAIL_PANELS[0] ? (
+        <EdgeTable edges={data.edges} labels={data.labels} />
+      ) : null}
+      {detailPanel === ANALYTICS_DETAIL_PANELS[1] ? (
+        <ComparisonTable comparisons={data.comparisons} labels={data.labels} />
+      ) : null}
     </div>
   );
 }

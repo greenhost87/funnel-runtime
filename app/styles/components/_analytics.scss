@@ -40,9 +40,17 @@
 .analytics-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: var(--space-3) var(--space-4);
   margin-bottom: var(--space-5);
   align-items: flex-end;
+}
+
+@media (min-width: 960px) {
+  .analytics-filters {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
 }
 
 .analytics-table-wrap {

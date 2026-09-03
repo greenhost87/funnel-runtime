@@ -1,0 +1,4 @@
+[install]
+linker = "isolated"
+# Turbopack cannot follow ~/.bun cache links — keep globalStore off everywhere.
+globalStore = false

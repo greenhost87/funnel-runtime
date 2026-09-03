@@ -4,6 +4,9 @@ import {
   createAnalyticsDao,
   type AnalyticsFilters,
 } from "@/system/database/analytics/analytics.dao";
+import { createVersionDao } from "@/system/database/versions/version.dao";
+import { FunnelConfigSchema, parseFunnelConfig } from "@/system/funnel/config.schema";
+import { parseJsonString } from "@/system/http/json";
 import { readRows } from "@/system/database/read-row";
 
 export type EdgeMetric = {
@@ -48,6 +51,16 @@ export type AnalyticsComparison = {
   ctaCtr: number | null;
 };
 
+export type AnalyticsVersionOption = {
+  versionId: string;
+  name: string;
+};
+
+export type AnalyticsLabels = {
+  versions: Record<string, string>;
+  steps: Record<string, string>;
+};
+
 export type AnalyticsDashboard = {
   summary: AnalyticsSummary;
   edges: EdgeMetric[];
@@ -55,7 +68,8 @@ export type AnalyticsDashboard = {
   stepFunnel: StepFunnelMetric[];
   sessionsByDay: SessionsByDayMetric[];
   campaigns: string[];
-  versions: string[];
+  versions: AnalyticsVersionOption[];
+  labels: AnalyticsLabels;
 };
 
 const CampaignRowSchema = v.object({
@@ -75,8 +89,53 @@ function mapValidatedRows<TSchema extends v.GenericSchema>(
   return readRows(db, sql, [], schema).map(mapRow);
 }
 
+function buildVersionName(versionId: string, configJson: string | null): string {
+  if (!configJson) {
+    return versionId.length > 12 ? `${versionId.slice(0, 8)}…` : versionId;
+  }
+  const config = parseFunnelConfig(parseJsonString(configJson, FunnelConfigSchema));
+  return config.name;
+}
+
+function buildStepLabels(
+  versionDao: ReturnType<typeof createVersionDao>,
+  versionIds: Iterable<string>,
+): Record<string, string> {
+  const labels: Record<string, string> = {};
+  for (const versionId of versionIds) {
+    const version = versionDao.getVersionById(versionId);
+    if (!version) {
+      continue;
+    }
+    const config = parseFunnelConfig(parseJsonString(version.config_json, FunnelConfigSchema));
+    for (const step of config.steps) {
+      labels[`${versionId}:${step.id}`] = step.title;
+    }
+  }
+  return labels;
+}
+
+function collectVersionIds(
+  edges: EdgeMetric[],
+  comparisons: AnalyticsComparison[],
+  stepFunnel: StepFunnelMetric[],
+): Set<string> {
+  const versionIds = new Set<string>();
+  for (const edge of edges) {
+    versionIds.add(edge.versionId);
+  }
+  for (const row of comparisons) {
+    versionIds.add(row.versionId);
+  }
+  for (const row of stepFunnel) {
+    versionIds.add(row.versionId);
+  }
+  return versionIds;
+}
+
 export function createAnalyticsService(db: Database) {
   const dao = createAnalyticsDao(db);
+  const versionDao = createVersionDao(db);
 
   function listCampaigns(): string[] {
     return mapValidatedRows(
@@ -87,13 +146,20 @@ export function createAnalyticsService(db: Database) {
     );
   }
 
-  function listVersions(): string[] {
-    return mapValidatedRows(
+  function listVersionOptions(): AnalyticsVersionOption[] {
+    const versionIds = mapValidatedRows(
       db,
       `SELECT DISTINCT version_id AS versionId FROM events ORDER BY version_id`,
       VersionRowSchema,
       (row) => row.versionId,
     );
+    return versionIds.map((versionId) => {
+      const version = versionDao.getVersionById(versionId);
+      return {
+        versionId,
+        name: buildVersionName(versionId, version?.config_json ?? null),
+      };
+    });
   }
 
   function getDashboard(filters: AnalyticsFilters = {}): AnalyticsDashboard {
@@ -150,6 +216,16 @@ export function createAnalyticsService(db: Database) {
 
     const stepFunnel = buildStepFunnel(views, completionByFrom);
     const sessionsByDay = dao.listSessionsStartedByDay(filters);
+    const versions = listVersionOptions();
+    const versionIds = collectVersionIds(edges, comparisons, stepFunnel);
+    for (const option of versions) {
+      versionIds.add(option.versionId);
+    }
+    const stepLabels = buildStepLabels(versionDao, versionIds);
+    const labels: AnalyticsLabels = {
+      versions: Object.fromEntries(versions.map((option) => [option.versionId, option.name])),
+      steps: stepLabels,
+    };
 
     return {
       summary,
@@ -158,7 +234,8 @@ export function createAnalyticsService(db: Database) {
       stepFunnel,
       sessionsByDay,
       campaigns: listCampaigns(),
-      versions: listVersions(),
+      versions,
+      labels,
     };
   }
 

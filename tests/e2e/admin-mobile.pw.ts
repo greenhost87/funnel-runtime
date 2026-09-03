@@ -100,6 +100,7 @@ test.describe("admin mobile layout at 320px", () => {
 
     await page.goto("/admin/analytics");
     await expect(page.getByText("Primary metric: CTA-from-start conversion")).toBeVisible();
+    await page.getByRole("button", { name: /Step funnel/i }).click();
     await expect(page.locator(".dt [data-label]").first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });

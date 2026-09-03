@@ -100,6 +100,11 @@ describe("analytics service", () => {
     expect(dashboard.stepFunnel).toEqual([
       { versionId, variant: "A", stepId: "welcome", views: 1, completions: 1 },
     ]);
+    expect(dashboard.versions).toEqual([{ versionId, name: "Personal Wellness Plan Quiz" }]);
+    expect(dashboard.labels.versions[versionId]).toBe("Personal Wellness Plan Quiz");
+    expect(dashboard.labels.steps[`${versionId}:welcome`]).toBe(
+      "Discover your personalized wellness roadmap",
+    );
   });
 
   test("filters by utm campaign without divide-by-zero", () => {
@@ -133,5 +138,14 @@ describe("analytics service", () => {
       dateTo: "2026-01-03",
     });
     expect(outOfRange.summary.sessionsStarted).toBe(0);
+  });
+
+  test("filters by survey version", () => {
+    const db = currentDatabase();
+    const { versionId } = createVersionService(db).publish(initialConfig);
+    seedAnalyticsScenario(db);
+    const filtered = createAnalyticsService(db).getDashboard({ versionId });
+    expect(filtered.summary.sessionsStarted).toBe(2);
+    expect(filtered.versions).toEqual([{ versionId, name: "Personal Wellness Plan Quiz" }]);
   });
 });

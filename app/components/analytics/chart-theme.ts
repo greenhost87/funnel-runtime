@@ -1,5 +1,14 @@
 import type { CSSProperties } from "react";
-import type { SessionsByDayMetric, StepFunnelMetric } from "@/system/analytics/analytics.service";
+import type {
+  AnalyticsLabels,
+  SessionsByDayMetric,
+  StepFunnelMetric,
+} from "@/system/analytics/analytics.service";
+import {
+  buildStepFunnelLabelContext,
+  formatStepFunnelAxisLabel,
+  formatStepFunnelFullLabel,
+} from "@/app/components/analytics/analytics-labels";
 
 export const CHART_COLORS = {
   primary: "var(--color-primary)",
@@ -45,11 +54,77 @@ export function buildSessionsOverTimeChartData(data: SessionsByDayMetric[]) {
   }));
 }
 
-export function buildStepFunnelChartData(data: StepFunnelMetric[]) {
+export interface StepFunnelChartRow {
+  versionId: string;
+  variant: string;
+  stepId: string;
+  views: number;
+  completions: number;
+  label: string;
+  fullLabel: string;
+}
+
+export interface StepFunnelChartView {
+  chartData: StepFunnelChartRow[];
+  axisWidthPx: number;
+  heightPx: number;
+}
+
+function buildStepFunnelChartData(
+  data: StepFunnelMetric[],
+  labels: AnalyticsLabels,
+): StepFunnelChartRow[] {
+  const context = buildStepFunnelLabelContext(data, labels);
   return data.map((row) => ({
-    ...row,
-    label: `${row.variant}·${row.versionId.slice(0, 8)}:${row.stepId}`,
+    versionId: row.versionId,
+    variant: row.variant,
+    stepId: row.stepId,
+    views: row.views,
+    completions: row.completions,
+    label: formatStepFunnelAxisLabel(row, labels, context),
+    fullLabel: formatStepFunnelFullLabel(row, labels),
   }));
+}
+
+const STEP_FUNNEL_MIN_HEIGHT_PX = 288;
+const STEP_FUNNEL_ROW_HEIGHT_PX = 44;
+const STEP_FUNNEL_CHROME_PX = 72;
+
+function stepFunnelChartHeightPx(rowCount: number): number {
+  if (rowCount <= 0) {
+    return STEP_FUNNEL_MIN_HEIGHT_PX;
+  }
+  return Math.max(
+    STEP_FUNNEL_MIN_HEIGHT_PX,
+    rowCount * STEP_FUNNEL_ROW_HEIGHT_PX + STEP_FUNNEL_CHROME_PX,
+  );
+}
+
+function stepFunnelAxisWidthPx(axisLabels: string[]): number {
+  const longest = axisLabels.reduce((max, label) => Math.max(max, label.length), 0);
+  return Math.min(320, Math.max(160, longest * 7));
+}
+
+export function buildStepFunnelChartView(
+  data: StepFunnelMetric[],
+  labels: AnalyticsLabels,
+): StepFunnelChartView {
+  const chartData = buildStepFunnelChartData(data, labels);
+  return {
+    chartData,
+    axisWidthPx: stepFunnelAxisWidthPx(chartData.map((row) => row.label)),
+    heightPx: stepFunnelChartHeightPx(chartData.length),
+  };
+}
+
+type StepFunnelTooltipPayload = {
+  payload?: {
+    fullLabel?: string;
+  };
+};
+
+export function formatStepFunnelTooltipLabel(payload: readonly StepFunnelTooltipPayload[]): string {
+  return payload[0]?.payload?.fullLabel ?? "";
 }
 
 type SessionsTooltipPayload = {
