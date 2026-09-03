@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ARTIFACT_NAME="${ARTIFACT_NAME:-funnel-runtime.tar.gz}"
 ARTIFACT_PATH="$ROOT_DIR/$ARTIFACT_NAME"
 ARTIFACT_DIR="$ROOT_DIR/dist-deploy"
