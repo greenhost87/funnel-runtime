@@ -85,13 +85,13 @@ export function createEventDao(db: Database) {
   }
 
   function eventExists(eventId: string): boolean {
-    return rowExists(db, `SELECT 1 FROM events WHERE event_id = ?`, eventId);
+    return rowExists(db, "SELECT 1 FROM events WHERE event_id = ?", eventId);
   }
 
   function listBySession(sessionId: string): StoredEvent[] {
     return readRows(
       db,
-      `SELECT * FROM events WHERE session_id = ? ORDER BY server_timestamp ASC`,
+      "SELECT * FROM events WHERE session_id = ? ORDER BY server_timestamp ASC",
       [sessionId],
       EventRowSchema,
     ).map(mapRow);

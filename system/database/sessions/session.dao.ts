@@ -159,7 +159,7 @@ export function createSessionDao(db: Database) {
   }
 
   function getById(id: string): SessionRow | null {
-    return readRow(db, `SELECT * FROM sessions WHERE id = ?`, id, SessionRowSchema);
+    return readRow(db, "SELECT * FROM sessions WHERE id = ?", id, SessionRowSchema);
   }
 
   function updateState(
@@ -247,7 +247,7 @@ export function createSessionTransitionDao(db: Database) {
 
   function getTransition(transitionId: string): TransitionRow | null {
     const row = db
-      .query(`SELECT * FROM session_transitions WHERE transition_id = ?`)
+      .query("SELECT * FROM session_transitions WHERE transition_id = ?")
       .get(transitionId);
     const parsed = v.safeParse(v.pipe(v.unknown(), TransitionRowSchema), row);
     return parsed.success ? parsed.output : null;
@@ -256,7 +256,7 @@ export function createSessionTransitionDao(db: Database) {
   function isTransitionLinkedToCompletion(transitionId: string): boolean {
     return rowExists(
       db,
-      `SELECT 1 FROM events WHERE transition_id = ? AND event_name = 'step_completed' LIMIT 1`,
+      "SELECT 1 FROM events WHERE transition_id = ? AND event_name = 'step_completed' LIMIT 1",
       transitionId,
     );
   }
@@ -264,7 +264,7 @@ export function createSessionTransitionDao(db: Database) {
   function hasTransitionFromStep(sessionId: string, stepId: string): boolean {
     return rowExists(
       db,
-      `SELECT 1 FROM session_transitions WHERE session_id = ? AND from_step_id = ? LIMIT 1`,
+      "SELECT 1 FROM session_transitions WHERE session_id = ? AND from_step_id = ? LIMIT 1",
       sessionId,
       stepId,
     );
@@ -273,7 +273,7 @@ export function createSessionTransitionDao(db: Database) {
   function hasTransitionToStep(sessionId: string, stepId: string): boolean {
     return rowExists(
       db,
-      `SELECT 1 FROM session_transitions WHERE session_id = ? AND to_step_id = ? LIMIT 1`,
+      "SELECT 1 FROM session_transitions WHERE session_id = ? AND to_step_id = ? LIMIT 1",
       sessionId,
       stepId,
     );
@@ -282,7 +282,7 @@ export function createSessionTransitionDao(db: Database) {
   function hasTransitionToResult(sessionId: string): boolean {
     return rowExists(
       db,
-      `SELECT 1 FROM session_transitions WHERE session_id = ? AND to_result = 1 LIMIT 1`,
+      "SELECT 1 FROM session_transitions WHERE session_id = ? AND to_result = 1 LIMIT 1",
       sessionId,
     );
   }

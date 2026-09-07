@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import type { ReactNode } from "react";
+import { AppFont } from "@/components/layout/app-font";
 import { getBasePath } from "@/system/config/base-path";
 import { themeInitScript } from "@/system/theme/theme";
 import "@/app/bootstrap-retention-cron";
@@ -15,17 +16,13 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="en" data-base-path={getBasePath() || undefined} suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
         <Script id="theme-init" strategy="beforeInteractive">
           {themeInitScript}
         </Script>
       </head>
-      <body>{children}</body>
+      <body>
+        <AppFont>{children}</AppFont>
+      </body>
     </html>
   );
 }

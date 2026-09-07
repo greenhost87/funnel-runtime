@@ -51,7 +51,7 @@ const ActiveVersionIdSchema = v.object({
 export function createVersionDao(db: Database) {
   function insertVersion(config: FunnelConfig): VersionRow {
     const id = randomUUIDv7();
-    db.query(`INSERT INTO funnel_versions (id, config_id, config_json) VALUES (?, ?, ?)`).run(
+    db.query("INSERT INTO funnel_versions (id, config_id, config_json) VALUES (?, ?, ?)").run(
       id,
       config.id,
       JSON.stringify(config),
@@ -64,15 +64,15 @@ export function createVersionDao(db: Database) {
   }
 
   function getVersionById(id: string): VersionRow | null {
-    return readRow(db, `SELECT * FROM funnel_versions WHERE id = ?`, id, VersionRowSchema);
+    return readRow(db, "SELECT * FROM funnel_versions WHERE id = ?", id, VersionRowSchema);
   }
 
   function recordActivation(versionId: string): ActivationRow {
     const result = db
-      .query(`INSERT INTO funnel_activation_history (version_id) VALUES (?)`)
+      .query("INSERT INTO funnel_activation_history (version_id) VALUES (?)")
       .run(versionId);
     const row = db
-      .query(`SELECT * FROM funnel_activation_history WHERE id = ?`)
+      .query("SELECT * FROM funnel_activation_history WHERE id = ?")
       .get(Number(result.lastInsertRowid));
     const parsed = v.parse(ActivationRowSchema, row);
     return parsed;
@@ -81,7 +81,7 @@ export function createVersionDao(db: Database) {
   function getActiveVersionId(): string | null {
     const row = db
       .query(
-        `SELECT version_id FROM funnel_activation_history ORDER BY activated_at DESC, id DESC LIMIT 1`,
+        "SELECT version_id FROM funnel_activation_history ORDER BY activated_at DESC, id DESC LIMIT 1",
       )
       .get();
     const parsed = v.safeParse(ActiveVersionIdSchema, row);

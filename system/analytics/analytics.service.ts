@@ -140,7 +140,7 @@ export function createAnalyticsService(db: Database) {
   function listCampaigns(): string[] {
     return mapValidatedRows(
       db,
-      `SELECT DISTINCT utm_campaign AS campaign FROM events WHERE utm_campaign IS NOT NULL ORDER BY campaign`,
+      "SELECT DISTINCT utm_campaign AS campaign FROM events WHERE utm_campaign IS NOT NULL ORDER BY campaign",
       CampaignRowSchema,
       (row) => row.campaign,
     );
@@ -149,7 +149,7 @@ export function createAnalyticsService(db: Database) {
   function listVersionOptions(): AnalyticsVersionOption[] {
     const versionIds = mapValidatedRows(
       db,
-      `SELECT DISTINCT version_id AS versionId FROM events ORDER BY version_id`,
+      "SELECT DISTINCT version_id AS versionId FROM events ORDER BY version_id",
       VersionRowSchema,
       (row) => row.versionId,
     );

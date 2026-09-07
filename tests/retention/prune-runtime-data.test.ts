@@ -26,7 +26,7 @@ function seedSql(index: number): string {
 function sqliteNowOffset(modifier: string): string {
   return v.parse(
     DateTimeRowSchema,
-    getDb().query(`SELECT datetime('now', ?) AS value`).get(modifier),
+    getDb().query("SELECT datetime('now', ?) AS value").get(modifier),
   ).value;
 }
 
@@ -53,13 +53,13 @@ describe("pruneRuntimeData", () => {
 
     const remaining = v.parse(
       v.array(SessionIdRowSchema),
-      getDb().query(`SELECT id FROM sessions ORDER BY id`).all(),
+      getDb().query("SELECT id FROM sessions ORDER BY id").all(),
     );
     expect(remaining.map((row) => row.id)).toEqual(["fresh"]);
 
     const versions = v.parse(
       CountRowSchema,
-      getDb().query(`SELECT COUNT(*) AS count FROM funnel_versions`).get(),
+      getDb().query("SELECT COUNT(*) AS count FROM funnel_versions").get(),
     );
     expect(versions.count).toBe(3);
   });
