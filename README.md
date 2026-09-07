@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/readme-banner.png" alt="Funnel Runtime banner" width="100%">
+</p>
+
 # Funnel Runtime
 
 Fullstack TypeScript runtime for configurable multi-step funnels, pinned configuration versions, A/B experiments, batched events, analytics, synthetic traffic, and rollback. The application uses Next.js, React, Bun, and SQLite without external services.
