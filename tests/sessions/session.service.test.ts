@@ -3,9 +3,9 @@ import initialConfig from "@/fixtures/funnels/initial.json";
 import alternativeConfig from "@/fixtures/funnels/alternative.json";
 import { createSessionService } from "@/system/sessions/session.service";
 import { createVersionService } from "@/system/versions/version.service";
-import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
+import { useIsolatedTestDatabase as createIsolatedTestDatabase } from "@/tests/setup/testDatabase";
 
-const currentDatabase = useIsolatedTestDatabase(import.meta.path);
+const currentDatabase = createIsolatedTestDatabase(import.meta.path);
 
 describe("session service", () => {
   test("pins version and variant across restore", () => {

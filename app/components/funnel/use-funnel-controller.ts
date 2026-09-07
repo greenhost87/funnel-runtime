@@ -26,6 +26,11 @@ type ControllerState = {
   draftAnswer: StepAnswer | null;
 };
 
+function answerForCurrentStep(data: FunnelApiState): StepAnswer | null {
+  const stepId = data.state.currentStepId;
+  return stepId ? (data.state.answers[stepId] ?? null) : null;
+}
+
 export function useFunnelController(initialQuery = "") {
   const [state, setState] = useState<ControllerState>({
     data: null,
@@ -34,48 +39,29 @@ export function useFunnelController(initialQuery = "") {
     validationError: null,
     draftAnswer: null,
   });
-  const viewedSteps = useRef(new Set<string>());
   const sessionStartedSent = useRef(false);
-  const eventIds = useRef<Record<string, string>>({});
   const loadStarted = useRef(false);
 
-  const stableEventId = useCallback((key: string) => {
-    eventIds.current[key] ??= createEventId();
-    return eventIds.current[key];
+  const emitStepViewed = useCallback(async (data: FunnelApiState, stepId: string) => {
+    await sendEventWithRetry(
+      createEventIntent({
+        eventId: createEventId(),
+        eventName: "step_viewed",
+        sessionId: data.sessionId,
+        stepId,
+      }),
+    );
   }, []);
 
-  const emitStepViewed = useCallback(
-    async (data: FunnelApiState, stepId: string) => {
-      const viewKey = `${data.sessionId}:${stepId}`;
-      if (viewedSteps.current.has(viewKey)) {
-        return;
-      }
-      viewedSteps.current.add(viewKey);
-      await sendEventWithRetry(
-        createEventIntent({
-          eventId: stableEventId(`step_viewed:${viewKey}`),
-          eventName: "step_viewed",
-          sessionId: data.sessionId,
-          stepId,
-        }),
-      );
-    },
-    [stableEventId],
-  );
-
-  const emitResultViewed = useCallback(
-    async (data: FunnelApiState) => {
-      const key = `result_viewed:${data.sessionId}`;
-      await sendEventWithRetry(
-        createEventIntent({
-          eventId: stableEventId(key),
-          eventName: "result_viewed",
-          sessionId: data.sessionId,
-        }),
-      );
-    },
-    [stableEventId],
-  );
+  const emitResultViewed = useCallback(async (data: FunnelApiState) => {
+    await sendEventWithRetry(
+      createEventIntent({
+        eventId: createEventId(),
+        eventName: "result_viewed",
+        sessionId: data.sessionId,
+      }),
+    );
+  }, []);
 
   const bootstrapEvents = useCallback(
     async (data: FunnelApiState) => {
@@ -119,7 +105,7 @@ export function useFunnelController(initialQuery = "") {
       ...prev,
       data,
       loading: false,
-      draftAnswer: null,
+      draftAnswer: answerForCurrentStep(data),
       validationError: null,
     }));
     await bootstrapEvents(data);
@@ -144,7 +130,7 @@ export function useFunnelController(initialQuery = "") {
       ...prev,
       data: payload,
       validationError: null,
-      draftAnswer: null,
+      draftAnswer: answerForCurrentStep(payload),
     }));
     return payload;
   }
@@ -165,16 +151,15 @@ export function useFunnelController(initialQuery = "") {
       return;
     }
 
-    const transitionKey = payload.transitionId ?? "missing";
     await sendEventBatch([
       createEventIntent({
-        eventId: stableEventId(`answer_submitted:${current.sessionId}:${stepId}`),
+        eventId: createEventId(),
         eventName: "answer_submitted",
         sessionId: current.sessionId,
         stepId,
       }),
       createEventIntent({
-        eventId: stableEventId(`step_completed:${transitionKey}`),
+        eventId: createEventId(),
         eventName: "step_completed",
         sessionId: current.sessionId,
         stepId,
@@ -203,7 +188,7 @@ export function useFunnelController(initialQuery = "") {
 
     await sendEventWithRetry(
       createEventIntent({
-        eventId: stableEventId(`step_completed:${payload.transitionId}`),
+        eventId: createEventId(),
         eventName: "step_completed",
         sessionId: current.sessionId,
         stepId,
@@ -230,9 +215,7 @@ export function useFunnelController(initialQuery = "") {
     }
     await sendEventWithRetry(
       createEventIntent({
-        eventId: stableEventId(
-          `back_clicked:${current.sessionId}:${current.state.history.join(">")}`,
-        ),
+        eventId: createEventId(),
         eventName: "back_clicked",
         sessionId: current.sessionId,
         stepId: current.state.currentStepId ?? undefined,
@@ -250,7 +233,7 @@ export function useFunnelController(initialQuery = "") {
     }
     await sendEventWithRetry(
       createEventIntent({
-        eventId: stableEventId(`cta_clicked:${current.sessionId}`),
+        eventId: createEventId(),
         eventName: "cta_clicked",
         sessionId: current.sessionId,
       }),

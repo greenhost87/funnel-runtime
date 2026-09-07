@@ -38,11 +38,9 @@ export function BulmaCalendarScripts() {
   return (
     <>
       <Script src={BULMA_CALENDAR_SCRIPT} strategy="afterInteractive" />
-      <Script
-        id="bulma-date-bridge"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{ __html: BULMA_DATE_BRIDGE_SCRIPT }}
-      />
+      <Script id="bulma-date-bridge" strategy="afterInteractive">
+        {BULMA_DATE_BRIDGE_SCRIPT}
+      </Script>
     </>
   );
 }

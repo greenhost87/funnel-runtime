@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import type { ReactNode } from "react";
 import { getBasePath } from "@/system/config/base-path";
 import { themeInitScript } from "@/system/theme/theme";
@@ -20,7 +21,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
       </head>
       <body>{children}</body>
     </html>

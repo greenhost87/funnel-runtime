@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as v from "valibot";
-import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
+import { useIsolatedTestDatabase as createIsolatedTestDatabase } from "@/tests/setup/testDatabase";
 import { pruneRuntimeData } from "@/system/retention/prune-runtime-data";
 
-const getDb = useIsolatedTestDatabase("retention-prune");
+const getDb = createIsolatedTestDatabase("retention-prune");
 const seedStatements = readFileSync(join(import.meta.dir, "fixtures/seed-session.sql"), "utf8")
   .split(";")
   .map((statement) => statement.trim())

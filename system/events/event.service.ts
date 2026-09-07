@@ -11,6 +11,8 @@ import {
 } from "@/system/database/sessions/session.dao";
 import { createVersionService } from "@/system/versions/version.service";
 import type { JsonValue } from "@/system/http/json";
+import { resolveEffectiveConfig } from "@/system/funnel/variant-resolver";
+import type { EffectiveFunnelConfig } from "@/system/funnel/config.types";
 
 const BUILT_IN_EVENTS = [
   "session_started",
@@ -43,13 +45,16 @@ export function createEventService(db: Database) {
   const transitions = createSessionTransitionDao(db);
   const versions = createVersionService(db);
 
-  function processBatch(items: BatchEventCandidate[]): BatchEventResult[] {
+  function processBatch(
+    items: BatchEventCandidate[],
+    expectedSessionId?: string,
+  ): BatchEventResult[] {
     return items.map((item, index) => {
       const parsed = v.safeParse(BatchEventItemSchema, item);
       if (!parsed.success) {
         return reject(readEventId(item, index), "Invalid event payload");
       }
-      return processOne(parsed.output);
+      return processOne(parsed.output, expectedSessionId);
     });
   }
 
@@ -94,6 +99,85 @@ export function createEventService(db: Database) {
     return null;
   }
 
+  function validateReachedStep(
+    item: BatchEventInput,
+    config: EffectiveFunnelConfig,
+  ): string | null {
+    const stepId = item.stepId;
+    if (!stepId || !config.steps.some((step) => step.id === stepId)) {
+      return "Step is not part of the pinned funnel variant";
+    }
+    const isInitialStep = config.steps[0]?.id === stepId;
+    if (!isInitialStep && !transitions.hasTransitionToStep(item.sessionId, stepId)) {
+      return "Session has not reached this step";
+    }
+    return null;
+  }
+
+  function validateEventState(item: BatchEventInput, config: EffectiveFunnelConfig): string | null {
+    if (item.eventName === "step_viewed" || item.eventName === "back_clicked") {
+      return validateReachedStep(item, config);
+    }
+    if (item.eventName === "answer_submitted") {
+      const reachedError = validateReachedStep(item, config);
+      if (reachedError) {
+        return reachedError;
+      }
+      return item.stepId && transitions.hasTransitionFromStep(item.sessionId, item.stepId)
+        ? null
+        : "No server transition exists for this answer";
+    }
+    if (
+      (item.eventName === "result_viewed" || item.eventName === "cta_clicked") &&
+      !transitions.hasTransitionToResult(item.sessionId)
+    ) {
+      return "Session has not reached the result";
+    }
+    return null;
+  }
+
+  function validateInput(item: BatchEventInput, expectedSessionId?: string): string | null {
+    const validationError = validateBatchItem(item);
+    if (validationError) {
+      return validationError;
+    }
+    if (expectedSessionId && item.sessionId !== expectedSessionId) {
+      return "Event session does not match the authenticated session";
+    }
+    return null;
+  }
+
+  function validateEventAgainstSession(item: BatchEventInput, session: SessionRow): string | null {
+    const config = versions.getConfigByVersionId(session.version_id);
+    const eventNameError = validateEventName(
+      item,
+      new Set(config.customEvents ?? []),
+      session.version_id,
+    );
+    if (eventNameError) {
+      return eventNameError;
+    }
+    const effectiveConfig = resolveEffectiveConfig(config, session.variant);
+    const stateError = validateEventState(item, effectiveConfig);
+    if (stateError) {
+      return stateError;
+    }
+    return item.eventName === "session_started" ? validateSessionStarted(item, session) : null;
+  }
+
+  function transitionIdForEvent(item: BatchEventInput): {
+    value: string | null;
+    error: string | null;
+  } {
+    if (item.eventName !== "step_completed") {
+      return { value: null, error: null };
+    }
+    const completed = validateStepCompleted(item);
+    return completed.ok
+      ? { value: completed.transitionId, error: null }
+      : { value: null, error: completed.reason };
+  }
+
   function persistEvent(
     item: BatchEventInput,
     session: SessionRow,
@@ -126,55 +210,42 @@ export function createEventService(db: Database) {
     return run();
   }
 
-  function processOne(item: BatchEventInput): BatchEventResult {
-    const validationError = validateBatchItem(item);
-    if (validationError) {
-      return reject(item.eventId, validationError);
+  function persistEventResult(
+    item: BatchEventInput,
+    session: SessionRow,
+    transitionId: string | null,
+  ): BatchEventResult {
+    try {
+      const insertResult = persistEvent(item, session, transitionId);
+      return insertResult === "duplicate"
+        ? { eventId: item.eventId, status: "duplicate" }
+        : { eventId: item.eventId, status: "accepted" };
+    } catch {
+      return reject(item.eventId, "Failed to persist event");
+    }
+  }
+
+  function processOne(item: BatchEventInput, expectedSessionId?: string): BatchEventResult {
+    const inputError = validateInput(item, expectedSessionId);
+    if (inputError) {
+      return reject(item.eventId, inputError);
     }
     if (events.eventExists(item.eventId)) {
       return { eventId: item.eventId, status: "duplicate" };
     }
-
     const session = sessions.getById(item.sessionId);
     if (!session) {
       return reject(item.eventId, "Unknown session");
     }
-
-    const config = versions.getConfigByVersionId(session.version_id);
-    const eventNameError = validateEventName(
-      item,
-      new Set(config.customEvents ?? []),
-      session.version_id,
-    );
-    if (eventNameError) {
-      return reject(item.eventId, eventNameError);
+    const sessionError = validateEventAgainstSession(item, session);
+    if (sessionError) {
+      return reject(item.eventId, sessionError);
     }
-
-    let transitionId: string | null = null;
-    if (item.eventName === "step_completed") {
-      const stepCompleted = validateStepCompleted(item);
-      if (!stepCompleted.ok) {
-        return reject(item.eventId, stepCompleted.reason);
-      }
-      transitionId = stepCompleted.transitionId;
+    const transition = transitionIdForEvent(item);
+    if (transition.error) {
+      return reject(item.eventId, transition.error);
     }
-
-    if (item.eventName === "session_started") {
-      const sessionStartedError = validateSessionStarted(item, session);
-      if (sessionStartedError) {
-        return reject(item.eventId, sessionStartedError);
-      }
-    }
-
-    try {
-      const insertResult = persistEvent(item, session, transitionId);
-      if (insertResult === "duplicate") {
-        return { eventId: item.eventId, status: "duplicate" };
-      }
-      return { eventId: item.eventId, status: "accepted" };
-    } catch {
-      return reject(item.eventId, "Failed to persist event");
-    }
+    return persistEventResult(item, session, transition.value);
   }
 
   return { processBatch };

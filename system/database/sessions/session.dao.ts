@@ -261,5 +261,38 @@ export function createSessionTransitionDao(db: Database) {
     );
   }
 
-  return { insertTransition, getTransition, isTransitionLinkedToCompletion };
+  function hasTransitionFromStep(sessionId: string, stepId: string): boolean {
+    return rowExists(
+      db,
+      `SELECT 1 FROM session_transitions WHERE session_id = ? AND from_step_id = ? LIMIT 1`,
+      sessionId,
+      stepId,
+    );
+  }
+
+  function hasTransitionToStep(sessionId: string, stepId: string): boolean {
+    return rowExists(
+      db,
+      `SELECT 1 FROM session_transitions WHERE session_id = ? AND to_step_id = ? LIMIT 1`,
+      sessionId,
+      stepId,
+    );
+  }
+
+  function hasTransitionToResult(sessionId: string): boolean {
+    return rowExists(
+      db,
+      `SELECT 1 FROM session_transitions WHERE session_id = ? AND to_result = 1 LIMIT 1`,
+      sessionId,
+    );
+  }
+
+  return {
+    insertTransition,
+    getTransition,
+    isTransitionLinkedToCompletion,
+    hasTransitionFromStep,
+    hasTransitionToStep,
+    hasTransitionToResult,
+  };
 }

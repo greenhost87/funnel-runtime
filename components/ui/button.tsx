@@ -41,8 +41,15 @@ function buttonClassName(
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "primary", cta, className, ...props },
+  { variant = "primary", cta, className, type = "button", ...props },
   ref,
 ) {
-  return <button ref={ref} className={buttonClassName(variant, cta, className)} {...props} />;
+  const resolvedClassName = buttonClassName(variant, cta, className);
+  if (type === "submit") {
+    return <button ref={ref} type="submit" className={resolvedClassName} {...props} />;
+  }
+  if (type === "reset") {
+    return <button ref={ref} type="reset" className={resolvedClassName} {...props} />;
+  }
+  return <button ref={ref} type="button" className={resolvedClassName} {...props} />;
 });

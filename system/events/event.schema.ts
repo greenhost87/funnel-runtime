@@ -27,10 +27,20 @@ export const BatchEventResponseSchema = v.object({
   results: v.array(BatchEventResultSchema),
 });
 
+const EVENTS_REQUIRING_STEP = new Set([
+  "step_viewed",
+  "answer_submitted",
+  "step_completed",
+  "back_clicked",
+]);
+
 export function validateBatchItem(item: BatchEventInput): string | null {
   const propertyError = validateEventProperties(item.properties);
   if (propertyError) {
     return propertyError;
+  }
+  if (EVENTS_REQUIRING_STEP.has(item.eventName) && !item.stepId) {
+    return `${item.eventName} requires stepId`;
   }
   if (item.eventName === "step_completed" && !item.transitionId) {
     return "step_completed requires transitionId";

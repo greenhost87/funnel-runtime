@@ -132,6 +132,7 @@ test.describe("funnel runtime e2e", () => {
   });
 
   test("refresh, back navigation, and validation", async ({ page }) => {
+    const batches = collectEventBatches(page);
     await openFunnel(page, "/?variant=A");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Next" }).click();
@@ -149,48 +150,83 @@ test.describe("funnel runtime e2e", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       "What is your primary wellness goal",
     );
+    await expect(page.getByRole("radio", { name: "Build strength and endurance" })).toBeChecked();
 
     await reloadFunnel(page);
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       "What is your primary wellness goal",
     );
+    await expect(page.getByRole("radio", { name: "Build strength and endurance" })).toBeChecked();
+
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "How often do you currently exercise?",
+    );
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "What is your primary wellness goal",
+    );
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "How often do you currently exercise?",
+    );
+
+    await expect
+      .poll(() => {
+        const answerEvents = batches
+          .flatMap((batch) => batch.events)
+          .filter((event) => event.eventName === "answer_submitted" && event.stepId === "goal");
+        return new Set(answerEvents.map((event) => event.eventId)).size;
+      })
+      .toBe(3);
   });
 
   test("session_started is retried until accepted and not resent afterward", async ({ page }) => {
-    let sessionStartedEventId: string | null = null;
-    let sessionStartedPosts = 0;
-
-    await page.route("**/api/events", async (route) => {
-      const parsed = v.safeParse(EventBatchPayloadParser, route.request().postDataJSON());
-      if (!parsed.success) {
-        await route.continue();
-        return;
-      }
-      const body = parsed.output;
-      const started = body.events.find((event) => event.eventName === "session_started");
-      if (started) {
-        sessionStartedEventId = started.eventId;
-        sessionStartedPosts += 1;
-        if (sessionStartedPosts <= 2) {
-          await route.abort("failed");
-          return;
-        }
-      }
-      await route.continue();
+    await page.addInitScript(() => {
+      const nativeFetch = window.fetch.bind(window);
+      Object.defineProperty(window, "fetch", {
+        configurable: true,
+        value: async (input: RequestInfo | URL, init?: RequestInit) => {
+          const isSessionStarted =
+            typeof init?.body === "string" && init.body.includes('"eventName":"session_started"');
+          if (!isSessionStarted) {
+            return nativeFetch(input, init);
+          }
+          const attempts =
+            Number(sessionStorage.getItem("e2e-session-started-attempts") ?? "0") + 1;
+          sessionStorage.setItem("e2e-session-started-attempts", String(attempts));
+          if (attempts <= 2) {
+            throw new TypeError("Synthetic network failure");
+          }
+          return nativeFetch(input, init);
+        },
+      });
     });
 
     await openFunnel(page, "/?variant=A");
-    await expect.poll(() => sessionStartedPosts).toBe(2);
-    expect(sessionStartedEventId).toBeTruthy();
+    await expect
+      .poll(async () =>
+        page.evaluate(() => Number(sessionStorage.getItem("e2e-session-started-attempts") ?? "0")),
+      )
+      .toBe(2);
 
     await reloadFunnel(page);
-    await expect.poll(() => sessionStartedPosts).toBeGreaterThanOrEqual(3);
-    await page.waitForTimeout(500);
-    const afterRecovery = sessionStartedPosts;
+    await expect
+      .poll(async () =>
+        page.evaluate(() => Number(sessionStorage.getItem("e2e-session-started-attempts") ?? "0")),
+      )
+      .toBeGreaterThanOrEqual(3);
+    const afterRecovery = await page.evaluate(() =>
+      Number(sessionStorage.getItem("e2e-session-started-attempts") ?? "0"),
+    );
 
     await reloadFunnel(page);
-    await page.waitForTimeout(500);
-    expect(sessionStartedPosts).toBe(afterRecovery);
+    await page.waitForTimeout(250);
+    expect(
+      await page.evaluate(() =>
+        Number(sessionStorage.getItem("e2e-session-started-attempts") ?? "0"),
+      ),
+    ).toBe(afterRecovery);
   });
 
   test("admin publication, analytics, and rollback", async ({ page }) => {
@@ -285,24 +321,35 @@ test.describe("funnel runtime e2e", () => {
       "Premium coaching overview",
     );
 
-    const customEventResponse = await newPage.request.post("/api/events", {
-      data: {
-        events: [
-          {
-            eventId: crypto.randomUUID(),
-            eventName: "premium_interest_signal",
-            sessionId,
-            clientTimestamp: new Date().toISOString(),
-            stepId: "goal",
-          },
-        ],
+    const customEventResponse = await newPage.evaluate(
+      async ({ eventId, sessionId: currentSessionId }) => {
+        const response = await fetch("/api/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            events: [
+              {
+                eventId,
+                eventName: "premium_interest_signal",
+                sessionId: currentSessionId,
+                clientTimestamp: new Date().toISOString(),
+                stepId: "goal",
+              },
+            ],
+          }),
+        });
+        return { ok: response.ok, body: await response.text() };
       },
-    });
-    expect(customEventResponse.ok()).toBe(true);
+      { eventId: crypto.randomUUID(), sessionId },
+    );
+    expect(customEventResponse.ok).toBe(true);
     const CustomEventResponseSchema = v.object({
       results: v.array(v.object({ status: v.string() })),
     });
-    const customPayload = v.parse(CustomEventResponseSchema, await customEventResponse.json());
+    const customPayload = v.parse(
+      v.pipe(v.string(), v.parseJson(), CustomEventResponseSchema),
+      customEventResponse.body,
+    );
     expect(customPayload.results[0]?.status).toBe("accepted");
 
     const variantBContext = await browser.newContext();

@@ -3,9 +3,9 @@ import initialConfig from "@/fixtures/funnels/initial.json";
 import alternativeConfig from "@/fixtures/funnels/alternative.json";
 import { createVersionDao } from "@/system/database/versions/version.dao";
 import { createVersionService } from "@/system/versions/version.service";
-import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
+import { useIsolatedTestDatabase as createIsolatedTestDatabase } from "@/tests/setup/testDatabase";
 
-const currentDatabase = useIsolatedTestDatabase(import.meta.path);
+const currentDatabase = createIsolatedTestDatabase(import.meta.path);
 
 describe("version service", () => {
   test("publish, immutable snapshots, rollback", () => {

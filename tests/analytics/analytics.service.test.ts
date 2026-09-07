@@ -4,9 +4,9 @@ import { createAnalyticsService } from "@/system/analytics/analytics.service";
 import { createEventService } from "@/system/events/event.service";
 import { createSessionService } from "@/system/sessions/session.service";
 import { createVersionService } from "@/system/versions/version.service";
-import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
+import { useIsolatedTestDatabase as createIsolatedTestDatabase } from "@/tests/setup/testDatabase";
 
-const currentDatabase = useIsolatedTestDatabase(import.meta.path);
+const currentDatabase = createIsolatedTestDatabase(import.meta.path);
 
 function seedAnalyticsScenario(db: ReturnType<typeof currentDatabase>) {
   const sessions = createSessionService(db);
@@ -20,6 +20,12 @@ function seedAnalyticsScenario(db: ReturnType<typeof currentDatabase>) {
     fromStepId: "welcome",
     toStepId: "goal",
     toResult: false,
+  });
+  sessions.recordForwardTransition({
+    sessionId: s1.sessionId,
+    fromStepId: "goal",
+    toStepId: null,
+    toResult: true,
   });
 
   const startedId1 = s1.pendingSessionStartedEventId;

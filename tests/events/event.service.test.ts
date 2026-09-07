@@ -4,9 +4,9 @@ import iteration2Config from "@/fixtures/funnels/iteration-2.json";
 import { createEventService } from "@/system/events/event.service";
 import { createSessionService } from "@/system/sessions/session.service";
 import { createVersionService } from "@/system/versions/version.service";
-import { useIsolatedTestDatabase } from "@/tests/setup/testDatabase";
+import { useIsolatedTestDatabase as createIsolatedTestDatabase } from "@/tests/setup/testDatabase";
 
-const currentDatabase = useIsolatedTestDatabase(import.meta.path);
+const currentDatabase = createIsolatedTestDatabase(import.meta.path);
 
 describe("event service", () => {
   test("accepts required events and deduplicates", () => {
@@ -105,7 +105,7 @@ describe("event service", () => {
     const db = currentDatabase();
     createVersionService(db).publish(initialConfig);
     const sessions = createSessionService(db);
-    const session = sessions.createNew({});
+    const session = sessions.createNew({ variantOverride: "A" });
     const service = createEventService(db);
     const results = service.processBatch([
       {
@@ -170,6 +170,12 @@ describe("event service", () => {
       toStepId: "goal",
       toResult: false,
     });
+    sessions.recordForwardTransition({
+      sessionId: session.sessionId,
+      fromStepId: "goal",
+      toStepId: null,
+      toResult: true,
+    });
     const startedEventId = session.pendingSessionStartedEventId;
     if (!startedEventId) {
       throw new Error("Expected pending session_started event id");
@@ -228,6 +234,50 @@ describe("event service", () => {
 
     expect(results.every((result) => result.status === "accepted")).toBe(true);
     expect(sessions.getSnapshot(session.sessionId)?.pendingSessionStartedEventId).toBeNull();
+  });
+
+  test("rejects events that are not backed by server session state", () => {
+    const db = currentDatabase();
+    createVersionService(db).publish(initialConfig);
+    const sessions = createSessionService(db);
+    const session = sessions.createNew({ variantOverride: "A" });
+    const otherSession = sessions.createNew({ variantOverride: "A" });
+    const service = createEventService(db);
+    const timestamp = new Date().toISOString();
+
+    const results = service.processBatch(
+      [
+        {
+          eventId: crypto.randomUUID(),
+          eventName: "step_viewed",
+          sessionId: session.sessionId,
+          clientTimestamp: timestamp,
+          stepId: "summary",
+        },
+        {
+          eventId: crypto.randomUUID(),
+          eventName: "result_viewed",
+          sessionId: session.sessionId,
+          clientTimestamp: timestamp,
+        },
+        {
+          eventId: crypto.randomUUID(),
+          eventName: "cta_clicked",
+          sessionId: session.sessionId,
+          clientTimestamp: timestamp,
+        },
+        {
+          eventId: crypto.randomUUID(),
+          eventName: "step_viewed",
+          sessionId: otherSession.sessionId,
+          clientTimestamp: timestamp,
+          stepId: "welcome",
+        },
+      ],
+      session.sessionId,
+    );
+
+    expect(results.every((result) => result.status === "rejected")).toBe(true);
   });
 
   test("accepts config-declared custom event from pinned version", () => {
