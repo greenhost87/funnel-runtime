@@ -14,7 +14,7 @@ import {
   AnalyticsCharts,
   type AnalyticsDetailPanel,
 } from "@/components/layout/analytics-charts";
-import { AdminCardTitle, DateField } from "@/components/ui/form";
+import { AdminCardTitle, DateField, FormError } from "@/components/ui/form";
 import { Select } from "@/components/ui/select";
 import { AnalyticsEmpty } from "@/components/ui/analytics-shell";
 import { DtCell } from "@/components/ui/dt-table/dt-table";
@@ -33,6 +33,7 @@ type AnalyticsDashboardProps = {
   data: AnalyticsDashboardData;
   filters: FilterState;
   loading: boolean;
+  error: string | null;
   detailPanel: AnalyticsDetailPanel | null;
   onFiltersChange: (next: FilterState) => void;
   onDetailPanelChange: (panel: AnalyticsDetailPanel | null) => void;
@@ -76,6 +77,7 @@ export function AnalyticsDashboard({
   data,
   filters,
   loading,
+  error,
   detailPanel,
   onFiltersChange,
   onDetailPanelChange,
@@ -85,6 +87,7 @@ export function AnalyticsDashboard({
   return (
     <div>
       <AdminCardTitle>Analytics dashboard</AdminCardTitle>
+      {error ? <FormError role="alert">{error}</FormError> : null}
       <AnalyticsFilters>
         <Select
           id="campaign"

@@ -191,7 +191,7 @@ export function createEventService(db: Database) {
         clientTimestamp: item.clientTimestamp,
         versionId: session.version_id,
         variant: session.variant,
-        stepId: item.stepId,
+        stepId: item.stepId ?? undefined,
         utmSource: session.utm_source ?? undefined,
         utmMedium: session.utm_medium ?? undefined,
         utmCampaign: session.utm_campaign ?? undefined,

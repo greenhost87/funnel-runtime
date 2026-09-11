@@ -22,11 +22,17 @@ type AnalyticsFilterHandlers = {
   setFilters: (filters: FilterState) => void;
   setLoading: (loading: boolean) => void;
   setData: (data: AnalyticsDashboardData) => void;
+  setError: (error: string | null) => void;
 };
 
-async function applyAnalyticsFilters(nextFilters: FilterState, handlers: AnalyticsFilterHandlers) {
+async function applyAnalyticsFilters(
+  previousFilters: FilterState,
+  nextFilters: FilterState,
+  handlers: AnalyticsFilterHandlers,
+) {
   handlers.setFilters(nextFilters);
   handlers.setLoading(true);
+  handlers.setError(null);
   const result = await getAnalyticsDashboardAction({
     campaign: nextFilters.campaign || undefined,
     variant: nextFilters.variant || undefined,
@@ -36,6 +42,9 @@ async function applyAnalyticsFilters(nextFilters: FilterState, handlers: Analyti
   });
   if (result.ok) {
     handlers.setData(result.data);
+  } else {
+    handlers.setFilters(previousFilters);
+    handlers.setError(result.error);
   }
   handlers.setLoading(false);
 }
@@ -50,12 +59,13 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
     dateTo: "",
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [detailPanel, setDetailPanel] = useState<AnalyticsDetailPanel | null>(null);
-  const filterHandlers: AnalyticsFilterHandlers = { setFilters, setLoading, setData };
+  const filterHandlers: AnalyticsFilterHandlers = { setFilters, setLoading, setData, setError };
 
   function updateFilters(nextFilters: FilterState) {
     setDetailPanel(null);
-    void applyAnalyticsFilters(nextFilters, filterHandlers);
+    void applyAnalyticsFilters(filters, nextFilters, filterHandlers);
   }
 
   return (
@@ -63,6 +73,7 @@ export function AnalyticsDashboardClient({ initialData }: Props) {
       data={data}
       filters={filters}
       loading={loading}
+      error={error}
       detailPanel={detailPanel}
       onFiltersChange={updateFilters}
       onDetailPanelChange={setDetailPanel}

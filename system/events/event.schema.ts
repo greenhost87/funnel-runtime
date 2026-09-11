@@ -3,13 +3,18 @@ import type { BatchEventInput } from "./event.types";
 import { EventPropertiesSchema, EventPropertyValueSchema } from "./event-properties.schema";
 import { validateEventProperties } from "./event-properties.schema";
 
+const OptionalAbsentStringSchema = v.pipe(
+  v.optional(v.nullable(v.string())),
+  v.transform((value) => value ?? undefined),
+);
+
 export const BatchEventItemSchema = v.object({
   eventId: v.string(),
   eventName: v.string(),
   sessionId: v.string(),
   clientTimestamp: v.string(),
-  stepId: v.optional(v.string()),
-  transitionId: v.optional(v.string()),
+  stepId: OptionalAbsentStringSchema,
+  transitionId: OptionalAbsentStringSchema,
   properties: v.optional(EventPropertiesSchema),
 });
 
