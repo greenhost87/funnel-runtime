@@ -2,21 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ErrorResponseSchema,
-  FunnelApiStateSchema,
-  MutationResponseSchema,
-} from "@/system/funnel/api-response.schema";
+  advanceFunnelStepAction,
+  goBackFunnelAction,
+  loadFunnelSessionAction,
+  submitFunnelAnswerAction,
+} from "@/app/actions/funnel";
 import type { FunnelApiState, MutationResponse } from "@/system/funnel/api-response.schema";
 import type { FunnelStep, StepAnswer } from "@/system/funnel/config.types";
-import { parseJsonFromReadable } from "@/system/http/json";
+import type { ActionResult } from "@/system/http/action-result";
 import {
   createEventId,
   createEventIntent,
   retryPendingEvents,
   sendEventBatch,
   sendEventWithRetry,
-} from "@/app/components/funnel/event-client";
-import { withBasePath } from "@/system/config/base-path";
+} from "@/components/layout/event-client";
 
 type ControllerState = {
   data: FunnelApiState | null;
@@ -93,14 +93,12 @@ export function useFunnelController(initialQuery = "") {
 
   const loadSession = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
-    const response = await fetch(withBasePath(`/api/funnel/session${initialQuery}`), {
-      method: "GET",
-    });
-    if (!response.ok) {
+    const result = await loadFunnelSessionAction(initialQuery);
+    if (!result.ok) {
       setState((prev) => ({ ...prev, loading: false, error: "Failed to load session" }));
       return;
     }
-    const data = await parseJsonFromReadable(response, FunnelApiStateSchema);
+    const data = result.data;
     setState((prev) => ({
       ...prev,
       data,
@@ -119,20 +117,18 @@ export function useFunnelController(initialQuery = "") {
     void loadSession();
   }, [loadSession]);
 
-  async function applyMutation(response: Response): Promise<MutationResponse | null> {
-    if (!response.ok) {
-      const payload = await parseJsonFromReadable(response, ErrorResponseSchema);
-      setState((prev) => ({ ...prev, validationError: payload.error }));
+  function applyMutation(result: ActionResult<MutationResponse>): MutationResponse | null {
+    if (!result.ok) {
+      setState((prev) => ({ ...prev, validationError: result.error }));
       return null;
     }
-    const payload = await parseJsonFromReadable(response, MutationResponseSchema);
     setState((prev) => ({
       ...prev,
-      data: payload,
+      data: result.data,
       validationError: null,
-      draftAnswer: answerForCurrentStep(payload),
+      draftAnswer: answerForCurrentStep(result.data),
     }));
-    return payload;
+    return result.data;
   }
 
   async function submitCurrentAnswer() {
@@ -141,12 +137,7 @@ export function useFunnelController(initialQuery = "") {
       return;
     }
     const stepId = current.state.currentStepId;
-    const response = await fetch(withBasePath("/api/funnel/answer"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stepId, answer: state.draftAnswer }),
-    });
-    const payload = await applyMutation(response);
+    const payload = applyMutation(await submitFunnelAnswerAction(stepId, state.draftAnswer));
     if (!payload) {
       return;
     }
@@ -180,8 +171,7 @@ export function useFunnelController(initialQuery = "") {
       return;
     }
     const stepId = current.state.currentStepId;
-    const response = await fetch(withBasePath("/api/funnel/advance"), { method: "POST" });
-    const payload = await applyMutation(response);
+    const payload = applyMutation(await advanceFunnelStepAction());
     if (!payload?.transitionId || !stepId) {
       return;
     }
@@ -208,8 +198,7 @@ export function useFunnelController(initialQuery = "") {
     if (!current) {
       return;
     }
-    const response = await fetch(withBasePath("/api/funnel/back"), { method: "POST" });
-    const payload = await applyMutation(response);
+    const payload = applyMutation(await goBackFunnelAction());
     if (!payload) {
       return;
     }

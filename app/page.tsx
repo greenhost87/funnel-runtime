@@ -1,4 +1,4 @@
-import { FunnelClient } from "@/app/components/funnel/funnel.client";
+import { FunnelClient } from "@/components/layout/funnel.client";
 import { PageContent, PageShell } from "@/components/layout/primitives";
 
 type SearchParams = Record<string, string | string[] | undefined>;

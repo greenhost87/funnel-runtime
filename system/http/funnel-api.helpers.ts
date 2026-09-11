@@ -42,6 +42,11 @@ export async function getSessionIdFromCookie(): Promise<string | undefined> {
   return store.get(SESSION_COOKIE_NAME)?.value;
 }
 
+export async function setSessionIdCookie(sessionId: string): Promise<void> {
+  const store = await cookies();
+  store.set(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions());
+}
+
 export function setSessionCookie(response: NextResponse, sessionId: string): void {
   response.cookies.set(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions());
 }
@@ -170,7 +175,7 @@ export function parseVariantOverride(searchParams: URLSearchParams): "A" | "B" |
   return undefined;
 }
 
-export function handleAnswerMutation(
+function handleAnswerMutation(
   db: Database,
   sessionId: string,
   stepId: string,
@@ -230,4 +235,14 @@ export async function runSessionMutation(
     return jsonResponse({ error: "No session" }, { status: 401 });
   }
   return handler(db, sessionId);
+}
+
+export async function runAnswerSessionMutation(
+  db: Database,
+  stepId: string,
+  answer: StepAnswer | undefined,
+): Promise<Response> {
+  return runSessionMutation(db, (database, sessionId) =>
+    handleAnswerMutation(database, sessionId, stepId, answer),
+  );
 }

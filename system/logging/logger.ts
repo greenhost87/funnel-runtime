@@ -4,7 +4,7 @@ const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 
 type LogLevel = (typeof LOG_LEVELS)[number];
 
-type LogFields = Record<string, string | number | boolean | null | undefined>;
+type LogFields = Record<string, string | number | boolean | null>;
 
 const LEVEL_RANK: Record<LogLevel, number> = {
   debug: 10,
@@ -42,9 +42,7 @@ function write(level: LogLevel, message: string, fields?: LogFields): void {
   };
   if (fields) {
     for (const [key, value] of Object.entries(fields)) {
-      if (value !== undefined) {
-        entry[key] = value;
-      }
+      entry[key] = value;
     }
   }
 

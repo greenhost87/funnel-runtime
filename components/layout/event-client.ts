@@ -1,16 +1,15 @@
-import { withBasePath } from "@/system/config/base-path";
-import { BatchEventItemSchema, BatchEventResponseSchema } from "@/system/events/event.schema";
+import { postEventBatchAction } from "@/app/actions/events";
+import { BatchEventItemSchema } from "@/system/events/event.schema";
 import type { BatchEventInput, BatchEventResult } from "@/system/events/event.types";
 import type { EventProperties } from "@/system/events/event-properties.schema";
-import { parseJsonFromReadable } from "@/system/http/json";
 import * as v from "valibot";
 
 export type EventIntentInput = {
   eventId: string;
   eventName: string;
   sessionId: string;
-  stepId?: string | null;
-  transitionId?: string | null;
+  stepId?: string;
+  transitionId?: string;
   properties?: EventProperties;
 };
 
@@ -51,19 +50,14 @@ function clearEventIntent(eventId: string): void {
 }
 
 async function postEventBatch(events: BatchEventInput[]): Promise<BatchEventResult[]> {
-  const response = await fetch(withBasePath("/api/events"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ events }),
-  });
-  if (!response.ok) {
-    throw new Error("Event batch failed");
+  const result = await postEventBatchAction(events);
+  if (!result.ok) {
+    throw new Error(result.error);
   }
-  const payload = await parseJsonFromReadable(response, BatchEventResponseSchema);
-  for (const result of payload.results) {
-    clearEventIntent(result.eventId);
+  for (const item of result.data.results) {
+    clearEventIntent(item.eventId);
   }
-  return payload.results;
+  return result.data.results;
 }
 
 function pendingEventIntents(sessionId: string): BatchEventInput[] {

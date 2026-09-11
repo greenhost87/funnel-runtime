@@ -1,20 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type SyntheticEvent } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import { PrimarySubmitButton } from "@/components/ui/action-buttons";
-import { DateInput } from "@/components/ui/date-input";
-import { Label } from "@/components/ui/label";
-import { Option } from "@/components/ui/primitives";
 import { Select } from "@/components/ui/select";
-import { AdminCard } from "@/components/layout/class-tagged";
-import { AdminErrorList } from "@/components/layout/admin-primitives";
-import { AdminCardTitle, FormField } from "@/components/layout/primitives";
-import { AnalyticsEmpty } from "@/components/layout/analytics-primitives";
-import { withBasePath } from "@/system/config/base-path";
-import { readAdminErrors } from "@/app/admin/read-admin-errors";
-import { TrafficGenerateResponseSchema } from "@/system/funnel/api-response.schema";
-import { parseJsonFromReadable } from "@/system/http/json";
+import { AdminCardEmpty, AdminCardWithErrors } from "@/components/layout/admin-primitives";
+import { AdminCardTitle, DateField } from "@/components/ui/form";
+import { AnalyticsEmpty } from "@/components/ui/analytics-shell";
+import { adminErrorsFromAction } from "@/app/admin/read-admin-errors";
+import { hydrateVersionsAdminState } from "@/app/admin/load-versions-admin-state";
+import { generateTrafficAction } from "@/app/actions/admin";
 
 const SESSION_PRESETS = [
   { value: 100, label: "100 — smoke test" },
@@ -35,15 +30,25 @@ type VersionOption = {
   isActive: boolean;
 };
 
-type Props = {
-  versions: VersionOption[];
-  activeVersionId: string | null;
-};
-
-export function TrafficClient({ versions, activeVersionId }: Props) {
+export function TrafficClient() {
+  const [versions, setVersions] = useState<VersionOption[] | null>(null);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+
+  useEffect(() => {
+    void hydrateVersionsAdminState({
+      onError: (error) => {
+        setErrors([error]);
+        setVersions([]);
+      },
+      onSuccess: (active, history) => {
+        setVersions(history);
+        setActiveVersionId(active?.versionId ?? null);
+      },
+    });
+  }, []);
 
   async function onGenerate(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,34 +72,42 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
     setErrors([]);
     setMessage(null);
 
-    const response = await fetch(withBasePath("/api/admin/traffic"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        versionId,
-        sessions: Number(formData.get("sessionPreset")),
-        date,
-      }),
+    const result = await generateTrafficAction({
+      versionId,
+      sessions: Number(formData.get("sessionPreset")),
+      date,
     });
 
     setLoading(false);
 
-    if (!response.ok) {
-      setErrors(await readAdminErrors(response));
+    if (!result.ok) {
+      setErrors(adminErrorsFromAction(result));
       return;
     }
 
-    const payload = await parseJsonFromReadable(response, TrafficGenerateResponseSchema);
-    setMessage(`Generated ${payload.generatedSessions} synthetic sessions for ${date}.`);
+    setMessage(`Generated ${result.data.generatedSessions} synthetic sessions for ${date}.`);
+  }
+
+  if (versions === null) {
+    return (
+      <div>
+        <AdminCardTitle>Test traffic</AdminCardTitle>
+        <AdminCardEmpty message="Loading versions…" />
+      </div>
+    );
   }
 
   if (versions.length === 0) {
     return (
       <div>
         <AdminCardTitle>Test traffic</AdminCardTitle>
-        <AdminCard>
-          <AnalyticsEmpty>Publish a funnel version first.</AnalyticsEmpty>
-        </AdminCard>
+        {errors.length > 0 ? (
+          <AdminCardWithErrors errors={errors}>
+            <AnalyticsEmpty>Publish a funnel version first.</AnalyticsEmpty>
+          </AdminCardWithErrors>
+        ) : (
+          <AdminCardEmpty message="Publish a funnel version first." />
+        )}
       </div>
     );
   }
@@ -103,7 +116,7 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
     <div>
       <AdminCardTitle>Test traffic</AdminCardTitle>
 
-      <AdminCard>
+      <AdminCardWithErrors errors={errors}>
         <p>
           Generate random synthetic sessions for a selected funnel version: UTM splits, A/B
           variants, drop-offs, duplicate batches, and out-of-order events.
@@ -114,38 +127,37 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
             void onGenerate(event);
           }}
         >
-          <FormField>
-            <Label htmlFor="versionId">Funnel version</Label>
-            <Select
-              id="versionId"
-              name="versionId"
-              defaultValue={activeVersionId ?? versions[0]?.versionId}
-              required
-            >
-              {versions.map((version) => (
-                <Option key={version.versionId} value={version.versionId}>
-                  {version.configId}
-                  {version.isActive ? " (active)" : ""} — {version.activatedAt}
-                </Option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField>
-            <Label htmlFor="sessionPreset">Volume</Label>
-            <Select id="sessionPreset" name="sessionPreset" defaultValue={500} required>
-              {SESSION_PRESETS.map((preset) => (
-                <Option key={preset.value} value={preset.value}>
-                  {preset.label}
-                </Option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField>
-            <Label htmlFor="date">Event date</Label>
-            <DateInput id="date" name="date" defaultValue={todayIsoDate()} required />
-          </FormField>
-          <PrimarySubmitButton loading={loading} loadingLabel="Generating…">
-            Generate traffic
+          <Select
+            id="versionId"
+            name="versionId"
+            label="Funnel version"
+            defaultValue={activeVersionId ?? versions[0]?.versionId}
+            required
+            options={versions.map((version) => ({
+              value: version.versionId,
+              label: `${version.configId}${version.isActive ? " (active)" : ""} — ${version.activatedAt}`,
+            }))}
+          />
+          <Select
+            id="sessionPreset"
+            name="sessionPreset"
+            label="Volume"
+            defaultValue={500}
+            required
+            options={SESSION_PRESETS.map((preset) => ({
+              value: String(preset.value),
+              label: preset.label,
+            }))}
+          />
+          <DateField
+            id="date"
+            name="date"
+            label="Event date"
+            defaultValue={todayIsoDate()}
+            required
+          />
+          <PrimarySubmitButton disabled={loading}>
+            {loading ? "Generating…" : "Generate traffic"}
           </PrimarySubmitButton>
         </form>
 
@@ -154,9 +166,7 @@ export function TrafficClient({ versions, activeVersionId }: Props) {
             {message} <Link href="/admin/analytics">Open analytics</Link>
           </p>
         ) : null}
-
-        <AdminErrorList errors={errors} />
-      </AdminCard>
+      </AdminCardWithErrors>
     </div>
   );
 }

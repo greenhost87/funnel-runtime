@@ -1,7 +1,7 @@
-import { VersionsClient } from "@/app/admin/(protected)/versions/versions.client";
-import { getVersionAdminData } from "@/app/admin/get-version-admin-data";
+"use client";
+
+import { VersionsClient } from "@/components/layout/versions-admin";
 
 export default function VersionsPage() {
-  const { active, history } = getVersionAdminData();
-  return <VersionsClient initialActive={active} initialHistory={history} />;
+  return <VersionsClient />;
 }

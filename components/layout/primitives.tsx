@@ -1,21 +1,4 @@
 import { type ReactNode } from "react";
-import type { LayoutParagraphProps } from "@/components/layout/html-props";
-
-export function FormError({ children, ...props }: LayoutParagraphProps) {
-  return (
-    <p className="help is-danger" {...props}>
-      {children}
-    </p>
-  );
-}
-
-type FormFieldProps = {
-  children: ReactNode;
-};
-
-export function FormField({ children }: FormFieldProps) {
-  return <div className="field">{children}</div>;
-}
 
 type PageContentProps = {
   children: ReactNode;
@@ -31,16 +14,6 @@ type PageShellProps = {
 
 export function PageShell({ children }: PageShellProps) {
   return <main className="page-shell">{children}</main>;
-}
-
-type AdminCardTitleProps = {
-  as?: "h1" | "h2";
-  children: ReactNode;
-};
-
-export function AdminCardTitle({ as: Tag = "h1", children }: AdminCardTitleProps) {
-  const className = Tag === "h1" ? "title is-4" : "title is-5 admin-card__title";
-  return <Tag className={className}>{children}</Tag>;
 }
 
 type AdminLoginProps = {

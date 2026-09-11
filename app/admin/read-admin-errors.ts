@@ -1,7 +1,5 @@
-import { ErrorResponseSchema } from "@/system/funnel/api-response.schema";
-import { parseJsonFromReadable } from "@/system/http/json";
+import type { ActionErr } from "@/system/http/action-result";
 
-export async function readAdminErrors(response: Response): Promise<string[]> {
-  const payload = await parseJsonFromReadable(response, ErrorResponseSchema);
-  return payload.details && payload.details.length > 0 ? payload.details : [payload.error];
+export function adminErrorsFromAction(result: ActionErr): string[] {
+  return result.details && result.details.length > 0 ? result.details : [result.error];
 }

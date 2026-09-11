@@ -23,6 +23,7 @@ type SelectProps = {
   onClick?: (event: MouseEvent<HTMLSelectElement>) => void;
   "aria-label"?: string;
   children?: ReactNode;
+  options?: readonly { value: string; label: string }[];
 };
 
 function selectFieldView(label: string, id: string | undefined, control: ReactNode): ReactNode {
@@ -37,12 +38,18 @@ function selectFieldView(label: string, id: string | undefined, control: ReactNo
 }
 
 function selectControlView(ref: Ref<HTMLSelectElement>, props: SelectProps): ReactNode {
-  const { label: _label, id, className, children, ...rest } = props;
+  const { label: _label, id, className, children, options, ...rest } = props;
+  const optionNodes =
+    options?.map((option) => (
+      <option key={option.value === "" ? "__blank" : option.value} value={option.value}>
+        {option.label}
+      </option>
+    )) ?? children;
 
   return (
     <div className="select is-fullwidth">
       <select ref={ref} id={id} className={className} {...rest}>
-        {children}
+        {optionNodes}
       </select>
     </div>
   );

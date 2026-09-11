@@ -2,34 +2,82 @@ import { expect, test, type Page, type Request } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as v from "valibot";
+import type { JsonValue } from "@/system/http/json";
+import { EventPropertyValueSchema } from "@/system/events/event-properties.schema";
 
-const EventBatchPayloadSchema = v.object({
-  events: v.array(
-    v.object({
-      eventId: v.string(),
-      eventName: v.string(),
-      transitionId: v.optional(v.string()),
-      stepId: v.optional(v.string()),
-    }),
-  ),
+const EventItemSchema = v.object({
+  eventId: v.string(),
+  eventName: v.string(),
+  transitionId: v.optional(v.string()),
+  stepId: v.optional(v.string()),
 });
-
-const SessionPayloadSchema = v.object({
-  sessionId: v.string(),
-});
-
+const EventBatchPayloadSchema = v.object({ events: v.array(EventItemSchema) });
 type EventBatchPayload = v.InferOutput<typeof EventBatchPayloadSchema>;
+type EventItem = v.InferOutput<typeof EventItemSchema>;
 
-const EventBatchPayloadParser = v.pipe(v.unknown(), EventBatchPayloadSchema);
+function collectEventsFromValue(value: JsonValue, into: EventItem[]): void {
+  const batch = v.safeParse(EventBatchPayloadSchema, value);
+  if (batch.success) {
+    into.push(...batch.output.events);
+    return;
+  }
+  const array = v.safeParse(v.array(EventItemSchema), value);
+  if (array.success) {
+    into.push(...array.output);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectEventsFromValue(item, into);
+    }
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const nested of Object.values(value)) {
+      if (nested !== undefined) {
+        collectEventsFromValue(nested, into);
+      }
+    }
+  }
+}
+
+function parseEventBatchFromRequest(request: Request): EventBatchPayload | null {
+  if (request.method() !== "POST") {
+    return null;
+  }
+  const raw = request.postData();
+  if (!raw?.includes("eventName")) {
+    return null;
+  }
+  const collected: EventItem[] = [];
+  const parsed = v.safeParse(v.pipe(v.string(), v.parseJson(), EventPropertyValueSchema), raw);
+  if (parsed.success) {
+    collectEventsFromValue(parsed.output, collected);
+  }
+  if (collected.length === 0) {
+    for (const match of raw.matchAll(
+      /\{\s*"eventId"\s*:\s*"([^"]+)"\s*,\s*"eventName"\s*:\s*"([^"]+)"[^}]*\}/g,
+    )) {
+      if (!match[1] || !match[2]) {
+        continue;
+      }
+      collected.push({
+        eventId: match[1],
+        eventName: match[2],
+        stepId: match[0].match(/"stepId"\s*:\s*"([^"]+)"/)?.[1],
+        transitionId: match[0].match(/"transitionId"\s*:\s*"([^"]+)"/)?.[1],
+      });
+    }
+  }
+  return collected.length > 0 ? { events: collected } : null;
+}
 
 function collectEventBatches(page: Page) {
   const batches: EventBatchPayload[] = [];
   page.on("request", (request: Request) => {
-    if (request.url().includes("/api/events") && request.method() === "POST") {
-      const parsed = v.safeParse(EventBatchPayloadParser, request.postDataJSON());
-      if (parsed.success) {
-        batches.push(parsed.output);
-      }
+    const parsed = parseEventBatchFromRequest(request);
+    if (parsed) {
+      batches.push(parsed);
     }
   });
   return batches;
@@ -41,29 +89,35 @@ function eventNames(batches: EventBatchPayload[]): string[] {
 
 const SESSION_READY_TIMEOUT = 30_000;
 
-async function waitForSessionResponse(page: Page) {
-  return page.waitForResponse(
-    (response) => response.url().includes("/api/funnel/session") && response.ok(),
-    { timeout: SESSION_READY_TIMEOUT },
-  );
+async function waitForFunnelReady(page: Page) {
+  await expect(page.getByRole("button", { name: /Continue|Next/ })).toBeVisible({
+    timeout: SESSION_READY_TIMEOUT,
+  });
 }
 
 async function openFunnel(page: Page, path: string) {
-  const sessionReady = waitForSessionResponse(page);
   await page.goto(path);
-  await sessionReady;
+  await waitForFunnelReady(page);
 }
 
 async function openFunnelWithSession(page: Page, path: string) {
-  const sessionReady = waitForSessionResponse(page);
-  await page.goto(path);
-  return sessionReady;
+  await openFunnel(page, path);
+  const sessionId = (await page.context().cookies()).find(
+    (cookie) => cookie.name === "funnel_session_id",
+  )?.value;
+  if (!sessionId) {
+    throw new Error("Missing funnel_session_id cookie");
+  }
+  return sessionId;
 }
 
 async function reloadFunnel(page: Page) {
-  const sessionReady = waitForSessionResponse(page);
   await page.reload();
-  await sessionReady;
+  await waitForFunnelReady(page);
+}
+
+function isEventBatchResponse(response: { request: () => Request }) {
+  return parseEventBatchFromRequest(response.request()) !== null;
 }
 
 async function adminLogin(page: Page) {
@@ -71,6 +125,20 @@ async function adminLogin(page: Page) {
   await page.getByLabel("Password").fill("e2e-admin");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "Funnel versions" })).toBeVisible();
+}
+
+async function publishIteration2(page: Page) {
+  const iterationConfig = readFileSync(
+    join(process.cwd(), "fixtures/funnels/iteration-2.json"),
+    "utf8",
+  );
+  await page.setInputFiles('input[type="file"]', {
+    name: "iteration-2.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(iterationConfig),
+  });
+  await page.getByRole("button", { name: "Publish" }).click();
+  await expect(page.getByText("Config ID: wellness-quiz-v2")).toBeVisible();
 }
 
 async function advanceVariantAFunnel(page: Page) {
@@ -230,11 +298,9 @@ test.describe("funnel runtime e2e", () => {
   });
 
   test("admin publication, analytics, and rollback", async ({ page }) => {
-    const eventsReady = page.waitForResponse(
-      (response) =>
-        response.url().includes("/api/events") && response.request().method() === "POST",
-      { timeout: SESSION_READY_TIMEOUT },
-    );
+    const eventsReady = page.waitForResponse(isEventBatchResponse, {
+      timeout: SESSION_READY_TIMEOUT,
+    });
     await openFunnel(page, "/?variant=A");
     await eventsReady;
     await page.getByRole("button", { name: "Continue" }).click();
@@ -250,17 +316,7 @@ test.describe("funnel runtime e2e", () => {
     expect(Number(startedBefore ?? 0)).toBeGreaterThanOrEqual(1);
 
     await page.goto("/admin/versions");
-    const iterationConfig = readFileSync(
-      join(process.cwd(), "fixtures/funnels/iteration-2.json"),
-      "utf8",
-    );
-    await page.setInputFiles('input[type="file"]', {
-      name: "iteration-2.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(iterationConfig),
-    });
-    await page.getByRole("button", { name: "Publish" }).click();
-    await expect(page.getByText("Config ID: wellness-quiz-v2")).toBeVisible();
+    await publishIteration2(page);
 
     await page.getByRole("button", { name: "Rollback" }).first().click();
     await expect(page.getByText("Config ID: wellness-quiz-v1")).toBeVisible();
@@ -286,17 +342,7 @@ test.describe("funnel runtime e2e", () => {
     const oldHeading = await page.getByRole("heading", { level: 1 }).textContent();
 
     await adminLogin(page);
-    const iterationConfig = readFileSync(
-      join(process.cwd(), "fixtures/funnels/iteration-2.json"),
-      "utf8",
-    );
-    await page.setInputFiles('input[type="file"]', {
-      name: "iteration-2.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(iterationConfig),
-    });
-    await page.getByRole("button", { name: "Publish" }).click();
-    await expect(page.getByText("Config ID: wellness-quiz-v2")).toBeVisible();
+    await publishIteration2(page);
 
     const oldContext = page.context();
     const oldPage = await oldContext.newPage();
@@ -305,9 +351,7 @@ test.describe("funnel runtime e2e", () => {
 
     const newContext = await browser.newContext();
     const newPage = await newContext.newPage();
-    const sessionResponse = await openFunnelWithSession(newPage, "/?variant=A");
-    const sessionPayload = v.parse(SessionPayloadSchema, await sessionResponse.json());
-    const sessionId = sessionPayload.sessionId;
+    const sessionId = await openFunnelWithSession(newPage, "/?variant=A");
     await expect(newPage.getByRole("heading", { level: 1 })).toContainText(
       "Discover your personalized wellness roadmap",
     );

@@ -13,7 +13,7 @@ test("logger writes json lines outside test when enabled", () => {
 
   const lines: string[] = [];
   const original = console.info;
-  console.info = (...args: Array<string | number | boolean | null | undefined>) => {
+  console.info = (...args: Array<string | number | boolean | null>) => {
     lines.push(String(args[1] ?? args[0]));
   };
 

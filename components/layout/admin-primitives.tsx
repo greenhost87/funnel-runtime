@@ -1,93 +1,15 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import type {
-  LayoutDivProps,
-  LayoutMainProps,
-  LayoutNavProps,
-} from "@/components/layout/html-props";
+import type { LayoutDivProps } from "@/components/ui/html-props";
+import { AdminCard } from "@/components/layout/class-tagged";
+import { AnalyticsEmpty } from "@/components/ui/analytics-shell";
 
-export function AdminLayout({ children, ...props }: LayoutDivProps) {
+export function AdminShell({ nav, children }: { nav: ReactNode; children: ReactNode }) {
   return (
-    <div className="admin-layout" {...props}>
-      {children}
+    <div className="admin-layout">
+      {nav}
+      <main className="admin-main">{children}</main>
     </div>
   );
-}
-
-export function AdminMain({ children, ...props }: LayoutMainProps) {
-  return (
-    <main className="admin-main" {...props}>
-      {children}
-    </main>
-  );
-}
-
-interface AdminNavProps extends LayoutNavProps {
-  collapsed?: boolean;
-}
-
-function adminNavClassName(collapsed?: boolean): string {
-  return ["admin-nav", collapsed ? "admin-nav--collapsed" : ""].filter(Boolean).join(" ");
-}
-
-export function AdminNav({ children, collapsed, ...props }: AdminNavProps) {
-  return (
-    <nav className={adminNavClassName(collapsed)} {...props}>
-      {children}
-    </nav>
-  );
-}
-
-type AdminNavLinkProps = {
-  href: string;
-  children: ReactNode;
-  active?: boolean;
-  title?: string;
-};
-
-export function AdminNavLink({ href, children, active, title }: AdminNavLinkProps) {
-  return (
-    <Link
-      href={href}
-      className="admin-nav__link"
-      aria-current={active ? "page" : undefined}
-      title={title}
-    >
-      {children}
-    </Link>
-  );
-}
-
-type AdminNavItemsProps = {
-  children: ReactNode;
-};
-
-export function AdminNavItems({ children }: AdminNavItemsProps) {
-  return <div className="admin-nav__items">{children}</div>;
-}
-
-type AdminNavFooterProps = {
-  children: ReactNode;
-};
-
-export function AdminNavFooter({ children }: AdminNavFooterProps) {
-  return <div className="admin-nav__footer">{children}</div>;
-}
-
-type AdminNavIconProps = {
-  children: ReactNode;
-};
-
-export function AdminNavIcon({ children }: AdminNavIconProps) {
-  return <span className="admin-nav__icon">{children}</span>;
-}
-
-type AdminNavLabelProps = {
-  children: ReactNode;
-};
-
-export function AdminNavLabel({ children }: AdminNavLabelProps) {
-  return <span className="admin-nav__label">{children}</span>;
 }
 
 function AdminValidationErrors({ children, ...props }: LayoutDivProps) {
@@ -98,35 +20,37 @@ function AdminValidationErrors({ children, ...props }: LayoutDivProps) {
   );
 }
 
-type AdminErrorListProps = {
-  errors: readonly string[];
-};
-
-export function AdminErrorList({ errors }: AdminErrorListProps) {
-  if (errors.length === 0) {
-    return null;
-  }
-
+function AdminErrorList({ children }: { children: ReactNode }) {
   return (
     <AdminValidationErrors>
-      <ul>
-        {errors.map((error) => (
-          <li key={error}>{error}</li>
-        ))}
-      </ul>
+      <ul>{children}</ul>
     </AdminValidationErrors>
   );
 }
 
-type VersionsHistoryRowProps = {
-  active?: boolean;
-  children: ReactNode;
-};
-
-function versionsHistoryRowClassName(active?: boolean): string | undefined {
-  return active ? "versions-history__row--active" : undefined;
+function adminErrorItems(errors: readonly string[]): ReactNode {
+  return errors.map((error) => <li key={error}>{error}</li>);
 }
 
-export function VersionsHistoryRow({ active, children }: VersionsHistoryRowProps) {
-  return <div className={versionsHistoryRowClassName(active)}>{children}</div>;
+export function AdminCardEmpty({ message }: { message: string }) {
+  return (
+    <AdminCard>
+      <AnalyticsEmpty>{message}</AnalyticsEmpty>
+    </AdminCard>
+  );
+}
+
+export function AdminCardWithErrors({
+  children,
+  errors,
+}: {
+  children: ReactNode;
+  errors: readonly string[];
+}) {
+  return (
+    <AdminCard>
+      {children}
+      {errors.length > 0 ? <AdminErrorList>{adminErrorItems(errors)}</AdminErrorList> : null}
+    </AdminCard>
+  );
 }

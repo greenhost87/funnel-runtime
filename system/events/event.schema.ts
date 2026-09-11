@@ -8,8 +8,8 @@ export const BatchEventItemSchema = v.object({
   eventName: v.string(),
   sessionId: v.string(),
   clientTimestamp: v.string(),
-  stepId: v.optional(v.nullable(v.string())),
-  transitionId: v.optional(v.nullable(v.string())),
+  stepId: v.optional(v.string()),
+  transitionId: v.optional(v.string()),
   properties: v.optional(EventPropertiesSchema),
 });
 

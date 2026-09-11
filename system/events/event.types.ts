@@ -4,13 +4,13 @@ import type { FunnelVariant } from "@/system/funnel/config.types";
 export type EventName = string;
 
 export interface EventAttributionFields {
-  stepId?: string | null;
-  utmSource?: string | null;
-  utmMedium?: string | null;
-  utmCampaign?: string | null;
-  utmTerm?: string | null;
-  utmContent?: string | null;
-  transitionId?: string | null;
+  stepId?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmTerm?: string;
+  utmContent?: string;
+  transitionId?: string;
 }
 
 export type BatchEventInput = {
@@ -18,8 +18,8 @@ export type BatchEventInput = {
   eventName: EventName;
   sessionId: string;
   clientTimestamp: string;
-  stepId?: string | null;
-  transitionId?: string | null;
+  stepId?: string;
+  transitionId?: string;
   properties?: EventProperties;
 };
 

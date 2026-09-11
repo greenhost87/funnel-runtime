@@ -1,17 +1,12 @@
 "use client";
 
-import { FormError } from "@/components/layout/primitives";
-import { FunnelConfigError, FunnelDescription } from "@/components/layout/class-tagged";
-import {
-  Funnel,
-  FunnelHeader,
-  FunnelLoading,
-  FunnelScreenControls,
-  FunnelTitle,
-} from "@/components/layout/funnel-primitives";
-import { FunnelStepProgress } from "@/app/components/funnel/funnel-progress";
-import { ResultScreen, ScreenRenderer } from "@/app/components/funnel/screens";
-import { useFunnelController } from "@/app/components/funnel/use-funnel-controller";
+import { FormError } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+import { FunnelConfigError, FunnelDescription } from "@/components/layout/funnel-tagged";
+import { Funnel, FunnelHeader, FunnelLoading } from "@/components/layout/funnel-primitives";
+import { FunnelStepProgress } from "@/components/layout/funnel-progress";
+import { ResultScreen, ScreenRenderer } from "@/components/layout/screens";
+import { useFunnelController } from "@/components/layout/use-funnel-controller";
 import type { FunnelStep, FunnelSessionState, StepAnswer } from "@/system/funnel/config.types";
 import type { FunnelApiState } from "@/system/funnel/api-response.schema";
 
@@ -66,19 +61,30 @@ function FunnelStepView({
     <Funnel>
       <FunnelStepProgress {...data.state.progress} />
       <FunnelHeader>
-        <FunnelTitle>{currentStep.title}</FunnelTitle>
+        <h1 className="title is-3 funnel__title">{currentStep.title}</h1>
         {currentStep.description ? (
           <FunnelDescription>{currentStep.description}</FunnelDescription>
         ) : null}
       </FunnelHeader>
       <ScreenRenderer step={currentStep} draftAnswer={draftAnswer} onDraftChange={onDraftChange} />
       {validationError ? <FormError role="alert">{validationError}</FormError> : null}
-      <FunnelScreenControls
-        showBack={canGoBack}
-        nextLabel={isInfo ? "Continue" : "Next"}
-        onBack={onBack}
-        onNext={onNext}
-      />
+      <div className="funnel__controls">
+        {canGoBack ? (
+          <Button
+            variant="secondary"
+            type="button"
+            className="funnel__control-button"
+            onClick={onBack}
+          >
+            Back
+          </Button>
+        ) : (
+          <span className="funnel__control-spacer" aria-hidden="true" />
+        )}
+        <Button variant="primary" type="button" className="funnel__control-button" onClick={onNext}>
+          {isInfo ? "Continue" : "Next"}
+        </Button>
+      </div>
     </Funnel>
   );
 }

@@ -3,15 +3,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FunnelConfigError, FunnelDescription } from "@/components/layout/class-tagged";
-import { FormField } from "@/components/layout/primitives";
-import {
-  FunnelHeader,
-  FunnelOptions,
-  FunnelResult,
-  FunnelResultBody,
-  FunnelResultTitle,
-} from "@/components/layout/funnel-primitives";
+import { FunnelConfigError, FunnelDescription } from "@/components/layout/funnel-tagged";
+import { FormField } from "@/components/ui/form";
+import { FunnelHeader, FunnelOptions } from "@/components/layout/funnel-primitives";
 import type {
   FunnelStep,
   InfoStep,
@@ -131,13 +125,13 @@ export function ResultScreen({
   onCtaClick: () => void;
 }) {
   return (
-    <FunnelResult>
-      <FunnelResultTitle>{result.title}</FunnelResultTitle>
-      <FunnelResultBody>{result.body}</FunnelResultBody>
+    <div className="funnel__result">
+      <h2 className="title is-4 funnel__result-title">{result.title}</h2>
+      <p className="funnel__result-body">{result.body}</p>
       <Button variant="primary" cta type="button" onClick={onCtaClick}>
         {result.cta.label}
       </Button>
-    </FunnelResult>
+    </div>
   );
 }
 

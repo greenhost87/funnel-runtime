@@ -23,8 +23,8 @@ const EventRowSchema = v.object({
   properties_json: v.string(),
 });
 
-function optionalString(value: string | null): string | null {
-  return value;
+function optionalString(value: string | null): string | undefined {
+  return value ?? undefined;
 }
 
 function mapRow(row: v.InferOutput<typeof EventRowSchema>): StoredEvent {

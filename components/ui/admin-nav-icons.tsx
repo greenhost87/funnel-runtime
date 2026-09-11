@@ -63,16 +63,3 @@ export function LogoutIcon({ className }: IconProps) {
     paths: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "M16 17l5-5-5-5", "M21 12H9"],
   });
 }
-
-type CollapseIconProps = {
-  className?: string;
-  collapsed: boolean;
-};
-
-export function CollapseIcon({ collapsed, className }: CollapseIconProps) {
-  return (
-    <AdminNavStrokeIcon className={className}>
-      {collapsed ? <path d="m9 18 6-6-6-6" /> : <path d="m15 18-6-6 6-6" />}
-    </AdminNavStrokeIcon>
-  );
-}

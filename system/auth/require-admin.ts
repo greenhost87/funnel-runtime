@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_COOKIE_NAME, verifyAdminSessionToken } from "@/system/auth/admin-session";
+import { actionErr, type ActionErr } from "@/system/http/action-result";
 import { jsonResponse } from "@/system/http/json";
 
 async function isAdminAuthenticated(): Promise<boolean> {
@@ -18,6 +19,13 @@ export async function requireAdminPage(): Promise<void> {
 export async function requireAdminApi() {
   if (!(await isAdminAuthenticated())) {
     return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+  }
+  return null;
+}
+
+export async function requireAdminAction(): Promise<ActionErr | null> {
+  if (!(await isAdminAuthenticated())) {
+    return actionErr("Unauthorized");
   }
   return null;
 }

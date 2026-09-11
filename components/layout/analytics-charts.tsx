@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -12,12 +12,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AdminCardTitle } from "@/components/layout/primitives";
+import { AdminCardTitle } from "@/components/ui/form";
 import {
   AnalyticsChartContainer,
-  AnalyticsChartPanel,
-  AnalyticsChartPanelBody,
-  AnalyticsChartsGrid,
   analyticsChartPanelAriaLabel,
   analyticsChartPanelContent,
   analyticsChartPanelSelected,
@@ -28,7 +25,7 @@ import type {
   SessionsByDayMetric,
   StepFunnelMetric,
 } from "@/system/analytics/analytics.service";
-import { formatVariantComparisonLabel } from "@/app/components/analytics/analytics-labels";
+import { formatVariantComparisonLabel } from "@/components/layout/analytics-labels";
 import {
   buildSessionsOverTimeChartData,
   buildStepFunnelChartView,
@@ -39,7 +36,7 @@ import {
   formatSessionsTooltipLabel,
   formatStepFunnelTooltipLabel,
   type StepFunnelChartView,
-} from "@/app/components/analytics/chart-theme";
+} from "@/components/layout/chart-theme";
 
 type Props = {
   stepFunnel: StepFunnelMetric[];
@@ -60,48 +57,105 @@ type VariantChartRow = {
   ctaCtr: number;
 };
 
-type ChartPanelProps = {
+type ChartPanelBaseProps = {
   title: string;
   emptyMessage: string;
   hasData: boolean;
   children: ReactNode;
-  detailHint?: string;
-  selected?: boolean;
-  onSelect?: () => void;
   wide?: boolean;
   canvasHeightPx?: number;
 };
 
-function ChartPanel({
+type SelectableChartPanelProps = {
+  title: string;
+  emptyMessage: string;
+  hasData: boolean;
+  children: ReactNode;
+  detailHint: string;
+  selected: boolean;
+  onSelect: () => void;
+  wide?: boolean;
+  canvasHeightPx?: number;
+};
+
+function chartPanelShellClassName(selected: boolean, wide: boolean): string {
+  return [
+    "analytics-chart-panel",
+    "box",
+    selected ? "analytics-chart-panel--selected" : "",
+    wide ? "analytics-chart-panel--wide" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function chartPanelBodyClassName(selected: boolean): string {
+  return [
+    "analytics-chart-panel__body",
+    "analytics-chart-panel__body--interactive",
+    selected ? "analytics-chart-panel__body--selected" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function chartPanelBodyKeyDown(onClick: () => void, event: KeyboardEvent<HTMLElement>): void {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    onClick();
+  }
+}
+
+function StaticChartPanel({
+  title,
+  emptyMessage,
+  hasData,
+  children,
+  wide = false,
+  canvasHeightPx,
+}: ChartPanelBaseProps) {
+  const content = analyticsChartPanelContent({ hasData, emptyMessage, canvasHeightPx, children });
+
+  return (
+    <section className={chartPanelShellClassName(false, wide)}>
+      <AdminCardTitle as="h2">{title}</AdminCardTitle>
+      {content}
+    </section>
+  );
+}
+
+function SelectableChartPanel({
   title,
   emptyMessage,
   hasData,
   children,
   detailHint,
-  selected = false,
+  selected,
   onSelect,
   wide = false,
   canvasHeightPx,
-}: ChartPanelProps) {
+}: SelectableChartPanelProps) {
+  const panelSelected = analyticsChartPanelSelected(onSelect, selected);
+  const content = analyticsChartPanelContent({ hasData, emptyMessage, canvasHeightPx, children });
+
   return (
-    <AnalyticsChartPanel
-      selected={analyticsChartPanelSelected(onSelect, selected)}
-      hint={detailHint}
-      wide={wide}
-      title={<AdminCardTitle as="h2">{title}</AdminCardTitle>}
-    >
-      {onSelect ? (
-        <AnalyticsChartPanelBody
-          selected={selected}
-          onClick={onSelect}
-          aria-label={analyticsChartPanelAriaLabel(title, detailHint)}
-        >
-          {analyticsChartPanelContent({ hasData, emptyMessage, canvasHeightPx, children })}
-        </AnalyticsChartPanelBody>
-      ) : (
-        analyticsChartPanelContent({ hasData, emptyMessage, canvasHeightPx, children })
-      )}
-    </AnalyticsChartPanel>
+    <section className={chartPanelShellClassName(panelSelected, wide)}>
+      <AdminCardTitle as="h2">{title}</AdminCardTitle>
+      <p className="analytics-chart-panel__hint">{detailHint}</p>
+      <div
+        className={chartPanelBodyClassName(selected)}
+        onClick={onSelect}
+        onKeyDown={(event) => {
+          chartPanelBodyKeyDown(onSelect, event);
+        }}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
+        aria-label={analyticsChartPanelAriaLabel(title, detailHint)}
+      >
+        {content}
+      </div>
+    </section>
   );
 }
 
@@ -109,7 +163,7 @@ function SessionsOverTimeChart({ data }: { data: SessionsByDayMetric[] }) {
   const chartData = buildSessionsOverTimeChartData(data);
 
   return (
-    <ChartPanel
+    <StaticChartPanel
       title="Sessions over time"
       emptyMessage="No session starts recorded yet."
       hasData={chartData.length > 0}
@@ -141,15 +195,9 @@ function SessionsOverTimeChart({ data }: { data: SessionsByDayMetric[] }) {
           />
         </AreaChart>
       </AnalyticsChartContainer>
-    </ChartPanel>
+    </StaticChartPanel>
   );
 }
-
-type StepFunnelChartProps = {
-  chartView: StepFunnelChartView;
-  selected: boolean;
-  onSelect: () => void;
-};
 
 function StepFunnelBars({ chartView }: { chartView: StepFunnelChartView }) {
   return (
@@ -188,25 +236,6 @@ function StepFunnelBars({ chartView }: { chartView: StepFunnelChartView }) {
   );
 }
 
-function StepFunnelChart({ chartView, selected, onSelect }: StepFunnelChartProps) {
-  return (
-    <ChartPanel
-      title="Step funnel"
-      emptyMessage="No step views recorded yet."
-      hasData={chartView.chartData.length > 0}
-      detailHint="Click chart to show step transitions table"
-      selected={selected}
-      onSelect={onSelect}
-      wide
-      canvasHeightPx={chartView.heightPx}
-    >
-      <AnalyticsChartContainer>
-        <StepFunnelBars chartView={chartView} />
-      </AnalyticsChartContainer>
-    </ChartPanel>
-  );
-}
-
 function VariantBars() {
   return (
     <>
@@ -226,12 +255,6 @@ function VariantBars() {
     </>
   );
 }
-
-type VariantComparisonChartProps = {
-  data: VariantChartRow[];
-  selected: boolean;
-  onSelect: () => void;
-};
 
 function VariantComparisonBars({ data }: { data: VariantChartRow[] }) {
   return (
@@ -258,24 +281,6 @@ function VariantComparisonBars({ data }: { data: VariantChartRow[] }) {
       <Legend />
       <VariantBars />
     </BarChart>
-  );
-}
-
-function VariantComparisonChart({ data, selected, onSelect }: VariantComparisonChartProps) {
-  return (
-    <ChartPanel
-      title="A/B and version conversion"
-      emptyMessage="No variant comparison data yet."
-      hasData={data.length > 0}
-      detailHint="Click to show comparison table"
-      selected={selected}
-      onSelect={onSelect}
-      wide
-    >
-      <AnalyticsChartContainer>
-        <VariantComparisonBars data={data} />
-      </AnalyticsChartContainer>
-    </ChartPanel>
   );
 }
 
@@ -310,22 +315,39 @@ export function AnalyticsCharts({
   const stepFunnelView = buildStepFunnelChartView(stepFunnel, labels);
 
   return (
-    <AnalyticsChartsGrid>
+    <div className="analytics-charts">
       <SessionsOverTimeChart data={sessionsByDay} />
-      <StepFunnelChart
-        chartView={stepFunnelView}
+      <SelectableChartPanel
+        title="Step funnel"
+        emptyMessage="No step views recorded yet."
+        hasData={stepFunnelView.chartData.length > 0}
+        detailHint="Click chart to show step transitions table"
         selected={detailPanel === ANALYTICS_DETAIL_PANELS[0]}
         onSelect={() => {
           onDetailPanelChange(toggleDetailPanel(detailPanel, ANALYTICS_DETAIL_PANELS[0]));
         }}
-      />
-      <VariantComparisonChart
-        data={variantRows}
+        wide
+        canvasHeightPx={stepFunnelView.heightPx}
+      >
+        <AnalyticsChartContainer>
+          <StepFunnelBars chartView={stepFunnelView} />
+        </AnalyticsChartContainer>
+      </SelectableChartPanel>
+      <SelectableChartPanel
+        title="A/B and version conversion"
+        emptyMessage="No variant comparison data yet."
+        hasData={variantRows.length > 0}
+        detailHint="Click to show comparison table"
         selected={detailPanel === ANALYTICS_DETAIL_PANELS[1]}
         onSelect={() => {
           onDetailPanelChange(toggleDetailPanel(detailPanel, ANALYTICS_DETAIL_PANELS[1]));
         }}
-      />
-    </AnalyticsChartsGrid>
+        wide
+      >
+        <AnalyticsChartContainer>
+          <VariantComparisonBars data={variantRows} />
+        </AnalyticsChartContainer>
+      </SelectableChartPanel>
+    </div>
   );
 }

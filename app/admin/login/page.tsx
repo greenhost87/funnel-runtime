@@ -2,17 +2,10 @@
 
 import { useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
-import { withBasePath } from "@/system/config/base-path";
+import { adminLoginAction } from "@/app/actions/admin";
 import { PrimarySubmitButton } from "@/components/ui/action-buttons";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  AdminCardTitle,
-  AdminLogin,
-  FormError,
-  FormField,
-  PageShell,
-} from "@/components/layout/primitives";
+import { AdminCardTitle, FormError, TextField } from "@/components/ui/form";
+import { AdminLogin, PageShell } from "@/components/layout/primitives";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -24,13 +17,9 @@ export default function AdminLoginPage() {
     event.preventDefault();
     setLoading(true);
     setError(null);
-    const response = await fetch(withBasePath("/api/admin/login"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
+    const result = await adminLoginAction(password);
     setLoading(false);
-    if (!response.ok) {
+    if (!result.ok) {
       setError("Invalid credentials");
       return;
     }
@@ -47,23 +36,21 @@ export default function AdminLoginPage() {
             void onSubmit(event);
           }}
         >
-          <FormField>
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              variant="form"
-              type="password"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-              }}
-              autoComplete="current-password"
-              required
-            />
-          </FormField>
+          <TextField
+            id="password"
+            label="Password"
+            variant="form"
+            type="password"
+            value={password}
+            onChange={(event) => {
+              setPassword(event.target.value);
+            }}
+            autoComplete="current-password"
+            required
+          />
           {error ? <FormError>{error}</FormError> : null}
-          <PrimarySubmitButton loading={loading} loadingLabel="Signing in…">
-            Sign in
+          <PrimarySubmitButton disabled={loading}>
+            {loading ? "Signing in…" : "Sign in"}
           </PrimarySubmitButton>
         </form>
       </AdminLogin>

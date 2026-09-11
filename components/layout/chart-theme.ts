@@ -8,7 +8,7 @@ import {
   buildStepFunnelLabelContext,
   formatStepFunnelAxisLabel,
   formatStepFunnelFullLabel,
-} from "@/app/components/analytics/analytics-labels";
+} from "@/components/layout/analytics-labels";
 
 export const CHART_COLORS = {
   primary: "var(--color-primary)",
